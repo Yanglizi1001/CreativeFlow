@@ -1,0 +1,13 @@
+node_modules/
+.pnpm-store/
+dist/
+release/
+package-desktop/dist/
+package-desktop/electron/
+.demo-build-profile/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db

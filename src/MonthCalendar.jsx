@@ -1,0 +1,7 @@
+import React from 'react';
+import { dateKey } from './dates';
+import { calendarWeeks, taskColor } from './calendarLayout';
+export function MonthCalendar({value,tasks,onDay,onDetail,selected}) {
+ const month=value.slice(0,7);
+ return <section className="range-calendar" aria-label="月计划"><div className="range-weekdays">{['一','二','三','四','五','六','日'].map(day=><span key={day}>{day}</span>)}</div>{calendarWeeks(value,tasks).map(({days,segments,hidden})=><div className="range-week" key={days[0]}><div className="range-day-grid">{days.map((day,index)=><div key={day} className={`range-day ${day===selected?'selected':''} ${day===dateKey()?'today':''} ${!day.startsWith(month)?'adjacent':''}`} role="button" tabIndex={0} aria-label={`${day} 当日计划`} onClick={()=>onDay(day)} onKeyDown={e=>{if(e.target===e.currentTarget&&e.key==='Enter')onDay(day);}}><time>{Number(day.slice(-2))}</time>{hidden[index]?<button className="range-more" onClick={e=>{e.stopPropagation();onDay(day);}}>还有 {hidden[index]} 项</button>:null}</div>)}</div><div className="range-bars">{segments.filter(s=>s.lane<3).map(({task,start,end,left,right,lane})=><button key={task.id} className={`range-bar ${start<days[0]?'continues-before':''} ${end>days[6]?'continues-after':''}`} style={{gridColumn:`${left+1} / ${right+2}`,gridRow:lane+1,background:taskColor(task)}} title={`${task.project.name} · ${task.name}\n${start} → ${end}\n${task.status}`} onClick={()=>onDetail(task)}>{task.name}</button>)}</div></div>)}</section>;
+}

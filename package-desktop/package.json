@@ -1,0 +1,46 @@
+{
+  "name": "creative-flow-desktop",
+  "version": "0.7.0-beta.1",
+  "private": true,
+  "packageManager": "traversal@1.0.0",
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "com.creativeflow.desktop",
+    "productName": "创作流",
+    "electronVersion": "44.4.3",
+    "electronDist": "../node_modules/electron/dist",
+    "npmRebuild": false,
+    "asar": true,
+    "directories": {
+      "output": "../release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "icon": "electron/assets/app.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "CreativeFlow-Setup-${version}-win-x64.${ext}"
+    },
+    "nsis": {
+      "installerIcon": "electron/assets/app.ico",
+      "uninstallerIcon": "electron/assets/app.ico",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "创作流",
+      "uninstallDisplayName": "创作流"
+    }
+  }
+}

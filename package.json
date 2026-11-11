@@ -1,0 +1,68 @@
+{
+  "name": "creative-flow-prototype",
+  "description": "面向创意工作者的个人项目、版本与修改意见管理应用",
+  "author": "Creative Flow",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Yanglizi1001/CreativeFlow.git"
+  },
+  "version": "0.7.0-beta.1",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "electron:dev": "electron .",
+    "package:win": "node ./node_modules/vite/bin/vite.js build && node ./scripts/prepare-desktop.cjs && node ./node_modules/electron-builder/out/cli/cli.js --projectDir ./package-desktop --win portable --x64",
+    "package:installer": "node ./node_modules/vite/bin/vite.js build && node ./scripts/prepare-desktop.cjs && node ./node_modules/electron-builder/out/cli/cli.js --projectDir ./package-desktop --win nsis --x64"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@noble/hashes": "1.8.0",
+    "@vitejs/plugin-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.creativeflow.desktop",
+    "productName": "创作流",
+    "electronDist": "node_modules/electron/dist",
+    "npmRebuild": false,
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "icon": "electron/assets/app.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "CreativeFlow-${version}-win-x64.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "创作流",
+      "uninstallDisplayName": "创作流"
+    }
+  }
+}
