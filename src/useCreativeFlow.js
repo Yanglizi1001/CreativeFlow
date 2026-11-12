@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { APP_STORAGE_KEY, cloneSeedData, uid } from './data';
 import { validDatabase } from './validateDatabase';
+import { COLOR_PALETTE, allocateTaskColor, migrateColors } from './colors';
 
 function loadDatabase() {
   let stored;
   try {
     stored = localStorage.getItem(APP_STORAGE_KEY);
-    if (!stored) return cloneSeedData();
+    if (!stored) return migrateColors(cloneSeedData(),false);
     const parsed = JSON.parse(stored);
     if (!validDatabase(parsed)) throw new Error('invalid database');
-    return { ...parsed, preferences: { ...parsed.preferences, customOptions: { projectStatuses: [], projectTypes: [], taskStages: [], ...(parsed.preferences?.customOptions || {}) } } };
+    return migrateColors({ ...parsed, preferences: { ...parsed.preferences, customOptions: { projectStatuses: [], projectTypes: [], taskStages: [], ...(parsed.preferences?.customOptions || {}) } } });
   } catch {
-    const next=cloneSeedData();
+    const next=migrateColors(cloneSeedData(),false);
     if(stored) { try {localStorage.setItem(APP_STORAGE_KEY+'-recovery',stored);next.preferences.recoveryAvailable=true;} catch {} }
     return next;
   }
@@ -49,7 +50,7 @@ export function useCreativeFlow() {
   }, [db]);
 
   useEffect(() => {
-    const sync = event => { if (event.key === APP_STORAGE_KEY && event.newValue) { try { const next = JSON.parse(event.newValue); if(validDatabase(next)) setDb(next); } catch {} } };
+    const sync = event => { if (event.key === APP_STORAGE_KEY && event.newValue) { try { const next = JSON.parse(event.newValue); if(validDatabase(next)) setDb(migrateColors(next)); } catch {} } };
     window.addEventListener('storage', sync);
     return () => window.removeEventListener('storage', sync);
   }, []);
@@ -101,7 +102,7 @@ export function useCreativeFlow() {
 
   const addProject = values => {
     const taskId = uid('task'); const versionId = uid('version');
-    const project = { id: uid('project'), name: values.name, description: values.description || '', notes: '', status: values.projectStatus || '计划中', type: values.type || '视频', start: values.start || '', due: values.due || '', color: values.color || '#1677ff', activities: [{ id: uid('activity'), at: activityTime(), text: '创建了项目' }], tasks: [{ id: taskId, name: values.taskName || '首个任务', type: values.type || '视频', status: '前期策划', start: values.start || '', due: values.due || '', versions: [{ id: versionId, name: 'V1', status: '进行中', createdAt: new Date().toISOString().slice(0, 10), file: null, lists: [] }] }] };
+    const project = { id: uid('project'), name: values.name, description: values.description || '', notes: '', status: values.projectStatus || '计划中', type: values.type || '视频', start: values.start || '', due: values.due || '', color: values.color || COLOR_PALETTE[db.projects.length % COLOR_PALETTE.length], defaultColor: COLOR_PALETTE[db.projects.length % COLOR_PALETTE.length], activities: [{ id: uid('activity'), at: activityTime(), text: '创建了项目' }], tasks: [{ id: taskId, color: COLOR_PALETTE[0], defaultColor: COLOR_PALETTE[0], name: values.taskName || '首个任务', type: values.type || '视频', status: '前期策划', start: values.start || '', due: values.due || '', versions: [{ id: versionId, name: 'V1', status: '进行中', createdAt: new Date().toISOString().slice(0, 10), file: null, lists: [] }] }] };
     setDb(current => ({ ...current, projects: [...current.projects, project] }));
     setSelection({ projectId: project.id, taskId, versionId, listId: undefined });
   };
@@ -118,7 +119,8 @@ export function useCreativeFlow() {
   };
   const addTask = values => {
     const versionId = uid('version');
-    const task = { id: uid('task'), name: values.name, type: values.type || active.project.type, status: values.status || '前期策划', start: values.start || '', due: values.due || active.project.due, versions: [{ id: versionId, name: 'V1', status: '进行中', createdAt: new Date().toISOString().slice(0, 10), file: null, lists: [] }] };
+    const color=allocateTaskColor(active.project.tasks);
+    const task = { id: uid('task'), color, defaultColor:color, name: values.name, type: values.type || active.project.type, status: values.status || '前期策划', start: values.start || '', due: values.due || active.project.due, versions: [{ id: versionId, name: 'V1', status: '进行中', createdAt: new Date().toISOString().slice(0, 10), file: null, lists: [] }] };
     updateProject(project => ({ ...project, start:task.start && (!project.start || task.start<project.start)?task.start:project.start, due:task.due && (!project.due || task.due>project.due)?task.due:project.due, tasks: [...project.tasks, task] }), `添加了任务「${task.name}」`);
     setSelection(current => ({ ...current, taskId: task.id, versionId, listId: undefined }));
   };
@@ -244,8 +246,8 @@ export function useCreativeFlow() {
     setSelection({ projectId, taskId, versionId, listId: createdListId });
   };
   const setReviewPosition = (projectId, taskId, versionId, seconds) => updateVersionAt(projectId, taskId, versionId, version => ({ ...version, reviewPosition: Math.max(0, Math.round(seconds)), reviewedAt: new Date().toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) }));
-  const reset = () => { const next = cloneSeedData(); setDb(next); localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(next)); window.location.reload(); };
-  const replaceDatabase = next => { setDb(next); localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(next)); window.location.reload(); };
+  const reset = () => { const next = migrateColors(cloneSeedData(),false); setDb(next); localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(next)); window.location.reload(); };
+  const replaceDatabase = database => { const next=migrateColors(database); setDb(next); localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(next)); window.location.reload(); };
 
   return { db, deletedItem, undoDeleteItem, saveStatus, setDb, selection, active, chooseProject, chooseTask, chooseVersion, chooseList, selectPath, updateProjectAt, updateProject, updateTask, updateVersion, updateVersionAt, recordActivity, addProject, deleteProject, addTask, deleteTask, addVersion, deleteVersion, addList, deleteList, addItem, addItemAt, addReviewItem, toggleItem, toggleItemAt, editItem, editItemAt, removeItem, importItems, setFile, clearFile, setReviewPosition, addCustomOption, removeCustomOption, reset, replaceDatabase };
 }

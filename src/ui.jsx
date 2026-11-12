@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import appIcon from './assets/app-icon-c.png';
+import { useColors } from './ColorContext';
+import { defaultTagColor, tagColors, validColor } from './colors';
+import { ColorPicker } from './ColorPicker';
 
 const paths = {
   home: '<path d="M3 11 12 3l9 8v9H15v-7H9v7H3z"/>',
@@ -82,7 +85,9 @@ function toneFor(value) {
 }
 
 export function StatusTag({ value, kind = 'stage', compact = false }) {
-  return <span className={`status-tag tone-${toneFor(value)} ${kind} ${compact ? 'compact' : ''}`}>{value}</span>;
+  const colors=useColors();
+  const custom=colors.tagColors?.[kind]?.[value];
+  return <span style={validColor(custom)?tagColors(custom):undefined} data-tag-kind={kind} data-tag-value={value} className={`status-tag tone-${toneFor(value)} ${kind} ${compact ? 'compact' : ''}`}>{value}</span>;
 }
 
 export function TypeIcon({ type, size = 18 }) {
@@ -90,6 +95,8 @@ export function TypeIcon({ type, size = 18 }) {
 }
 
 export function AcrylicSelect({ value, options, onChange, label, className = '', renderValue, creatable = false, onCreate, createLabel = '添加自定义标签' }) {
+  const colors=useColors();
+  const colorKind=({'项目状态':'project','版本状态':'version','项目类型':'type','任务类型':'type','项目阶段':'stage','任务阶段':'stage','当前阶段':'stage','筛选阶段':'stage'})[label];
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [menuStyle, setMenuStyle] = useState({});
@@ -105,11 +112,12 @@ export function AcrylicSelect({ value, options, onChange, label, className = '',
       const estimatedHeight = Math.min(330, options.length * 34 + (creatable ? 48 : 10));
       const below = window.innerHeight - rect.bottom;
       const top = below >= Math.min(estimatedHeight, 220) ? rect.bottom + 5 : Math.max(8, rect.top - estimatedHeight - 5);
-      setMenuStyle({ left: rect.left, top, minWidth: rect.width });
+      const width = Math.min(window.innerWidth - 16,Math.max(rect.width, creatable ? 230 : 160));
+      setMenuStyle({ left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)), top, width, minWidth: width, maxWidth: window.innerWidth - 16 });
     };
     position();
-    const close = event => { if (!rootRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) setOpen(false); };
-    const escape = event => { if (event.key === 'Escape') { event.preventDefault(); setOpen(false); triggerRef.current?.focus(); } };
+    const close = event => { if (!event.target.closest('[data-color-editor]') && !rootRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) setOpen(false); };
+    const escape = event => { if (event.key === 'Escape' && !event.target.closest('[data-color-editor]')) { event.preventDefault(); setOpen(false); triggerRef.current?.focus(); } };
     document.addEventListener('pointerdown', close);
     document.addEventListener('keydown', escape);
     window.addEventListener('resize', position);
@@ -123,18 +131,34 @@ export function AcrylicSelect({ value, options, onChange, label, className = '',
     setDraft('');
     setOpen(false);
   };
-  const menu = open ? <div className="acrylic-menu acrylic-menu-portal" style={menuStyle} role="listbox" aria-label={label} ref={menuRef}>
+  const menu = open ? <div className="acrylic-menu acrylic-menu-portal" style={menuStyle} role="listbox" aria-label={label} ref={menuRef} onKeyDown={event => {
+    if (event.target.tagName === 'INPUT') return;
+    const buttons = [...menuRef.current.querySelectorAll('[role="option"]')];
+    const index = buttons.indexOf(document.activeElement);
+    if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+      event.preventDefault();
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
+      buttons[next]?.focus();
+    }
+  }}>
     {options.map(option => {
       const item = typeof option === 'string' ? { value: option, label: option } : option;
-      return <button type="button" role="option" aria-selected={item.value === value} key={item.value} className={item.value === value ? 'selected' : ''} onClick={() => { onChange(item.value); setOpen(false); }}>
-        {item.tag ? <StatusTag value={item.label} kind={item.kind} /> : <span>{item.label}</span>}{item.value === value ? <Icon name="check" size={15} /> : null}
-      </button>;
+      const kind=item.kind||colorKind;
+      const editable=kind&&colors.setTagColor&&item.value!=='全部阶段';
+      return <div className="acrylic-option-row" key={item.value}><button type="button" role="option" aria-selected={item.value === value} className={item.value === value ? 'selected' : ''} onClick={() => { onChange(item.value); setOpen(false); triggerRef.current?.focus(); }}>
+        {item.tag||kind ? <StatusTag value={item.label} kind={kind} /> : <span>{item.label}</span>}{item.value === value ? <Icon name="check" size={15} /> : null}
+      </button>{editable?<ColorPicker compact label={`${item.label}标签颜色`} value={colors.tagColors?.[kind]?.[item.label]} defaultColor={defaultTagColor(item.label)} tag preview={item.label} onChange={color=>colors.setTagColor(kind,item.label,color)}/>:null}</div>;
     })}
     {creatable ? <div className="acrylic-create"><Icon name="plus" size={15} /><input value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); create(); } }} placeholder={createLabel} aria-label={createLabel} /><button type="button" onClick={create} disabled={!draft.trim()} aria-label="确认添加"><Icon name="check" size={15} /></button></div> : null}
   </div> : null;
   return <div className={`acrylic-select ${open ? 'open' : ''} ${className}`} ref={rootRef}>
-    <button ref={triggerRef} type="button" className="acrylic-trigger" aria-label={label} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(current => !current)}>
-      {renderValue ? renderValue(value) : currentOption?.tag ? <StatusTag value={currentOption.label} kind={currentOption.kind} compact /> : <span>{currentOption?.label ?? value}</span>}<Icon name="down" size={15} />
+    <button ref={triggerRef} type="button" className="acrylic-trigger" aria-label={label} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(current => !current)} onKeyDown={event => {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault(); setOpen(true);
+        requestAnimationFrame(() => { const options = menuRef.current?.querySelectorAll('[role="option"]'); const selected = menuRef.current?.querySelector('[aria-selected="true"]'); (selected || options?.[event.key === 'ArrowUp' ? options.length - 1 : 0])?.focus(); });
+      }
+    }}>
+      {renderValue ? renderValue(value) : currentOption?.tag||colorKind ? <StatusTag value={currentOption?.label??value} kind={currentOption?.kind||colorKind} compact /> : <span>{currentOption?.label ?? value}</span>}<Icon name="down" size={15} />
     </button>
     {menu ? createPortal(menu, document.body) : null}
   </div>;
@@ -148,6 +172,7 @@ export function Modal({ title, children, onClose, footer }) {
     const dialog = dialogRef.current;
     (dialog.querySelector('[autofocus], input, textarea, button') || dialog).focus();
     const trap = event => {
+      if (event.target.closest('[data-color-editor]')) return;
       if (event.key !== 'Tab') return;
       const nodes = [...dialog.querySelectorAll('button:not(:disabled),input:not(:disabled),textarea,select,[tabindex="0"]')].filter(el=>el.getClientRects().length);
       const first=nodes[0], last=nodes.at(-1);
@@ -182,6 +207,17 @@ export function useResizableWidth(storageKey, initial = 252, min = 220, max = 36
   });
   const resetWidth = () => setWidth(initial);
   return { width, setWidth, resetWidth, min, max };
+}
+
+export function ExplorerPanel({ title, label, storageKey, actions, className = '', children }) {
+  const [collapsed,setCollapsed]=useState(false);
+  const size=useResizableWidth(storageKey,252,220,360);
+  const toggleRef=useRef(null);
+  const focusPending=useRef(false);
+  const toggle=()=>{focusPending.current=true;setCollapsed(current=>!current);};
+  useEffect(()=>{if(focusPending.current){toggleRef.current?.focus();focusPending.current=false;}},[collapsed]);
+  if(collapsed)return <aside className={`explorer collapsed ${className}`.trim()} aria-label={title}><button ref={toggleRef} title={`展开${label}侧栏`} aria-label={`展开${label}侧栏`} aria-expanded={false} onClick={toggle}><Icon name="right"/></button></aside>;
+  return <aside className={`explorer resizable-panel ${className}`.trim()} aria-label={title} style={{width:size.width}}><div className="explorer-heading"><strong>{title}</strong><div>{actions}<button ref={toggleRef} title={`收起${label}侧栏`} aria-label={`收起${label}侧栏`} aria-expanded={true} onClick={toggle}><Icon name="left"/></button></div></div>{children}<ResizeHandle {...size}/></aside>;
 }
 
 export function ResizeHandle({ width, setWidth, resetWidth, min, max, side = 'right', label = '调整侧栏宽度' }) {

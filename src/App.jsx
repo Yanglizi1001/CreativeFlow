@@ -1,4 +1,5 @@
 import { useScrollMemory } from './viewState';
+import { ColorProvider } from './ColorContext';
 import React, { useEffect, useState } from 'react';
 import { useCreativeFlow } from './useCreativeFlow';
 import { Breadcrumbs, Button, Icon, Modal } from './ui';
@@ -16,7 +17,10 @@ export default function App() {
   const [reviewScope, setReviewScope] = useState('all');
   const [returnStack, setReturnStack] = useState([]);
   useScrollMemory(view+':'+projectLevel+':'+reviewLevel);
-  const rememberLocation = () => setReturnStack(stack => [...stack, { view, projectLevel, reviewLevel, reviewScope, selection: flow.selection }]);
+  const rememberLocation = () => setReturnStack(stack => {
+    const next = { view, projectLevel, reviewLevel, reviewScope, selection: { ...flow.selection } };
+    return JSON.stringify(stack.at(-1)) === JSON.stringify(next) ? stack : [...stack, next];
+  });
   const canGoBack = returnStack.length > 0 || (view === 'projects' && projectLevel !== 'overview') || (view === 'review' && (reviewLevel === 'workspace' || reviewScope !== 'all'));
   const goBack = () => {
     setRightPanel(false);
@@ -40,10 +44,12 @@ export default function App() {
     return () => window.removeEventListener('hashchange', syncHash);
   }, []);
   const changeView = next => { setReturnStack([]); setReviewScope('all'); setRightPanel(false); setView(next); if (next === 'projects') setProjectLevel('overview'); if (next === 'review') setReviewLevel('center'); };
-  const openTask = (projectId, taskId) => { rememberLocation(); flow.selectPath({ projectId, taskId }); setView('projects'); setProjectLevel('task'); };
-  const openProject = projectId => { rememberLocation(); flow.chooseProject(projectId); setView('projects'); setProjectLevel('detail'); };
+  const openTask = (projectId, taskId) => { if (view !== 'projects' || projectLevel !== 'task' || flow.active.task?.id !== taskId) rememberLocation(); setRightPanel(false); flow.selectPath({ projectId, taskId }); setView('projects'); setProjectLevel('task'); };
+  const openProject = projectId => { if (view !== 'projects' || projectLevel !== 'detail' || flow.active.project?.id !== projectId) rememberLocation(); setRightPanel(false); flow.chooseProject(projectId); setView('projects'); setProjectLevel('detail'); };
+  const openReviewCenter = (scope = 'all') => { if (reviewLevel !== 'center' || reviewScope !== scope) rememberLocation(); if (scope !== 'all') flow.chooseProject(scope); setRightPanel(false); setReviewScope(scope); setReviewLevel('center'); };
   const openReview = (projectId = flow.active.project?.id, taskId = flow.active.task?.id, versionId = flow.active.version?.id) => {
-    rememberLocation();
+    if (view !== 'review' || reviewLevel !== 'workspace' || flow.active.task?.id !== taskId) rememberLocation();
+    setRightPanel(false);
     const project = flow.db.projects.find(item => item.id === projectId);
     const task = project?.tasks.find(item => item.id === taskId);
     const version = task?.versions.find(item => item.id === versionId) || task?.versions.at(-1);
@@ -59,17 +65,17 @@ export default function App() {
     ...(projectLevel!=='overview' && flow.active.project ? [{label:flow.active.project.name,current:projectLevel==='detail',onClick:projectLevel==='detail'?undefined:closeDetails(()=>setProjectLevel('detail'))}] : []),
     ...(projectLevel==='task' && flow.active.task ? [{label:flow.active.task.name,current:true}] : [])
   ] : view === 'review' ? [
-    {label:'审阅中心',current:reviewLevel==='center'&&reviewScope==='all',onClick:reviewLevel==='center'&&reviewScope==='all'?undefined:()=>{setReviewScope('all');setReviewLevel('center');}},
-    ...((reviewLevel==='workspace'?flow.active.project:flow.db.projects.find(p=>p.id===reviewScope)) ? [{label:(reviewLevel==='workspace'?flow.active.project:flow.db.projects.find(p=>p.id===reviewScope)).name,current:reviewLevel==='center',onClick:reviewLevel==='workspace'?()=>{setReviewScope(flow.active.project.id);setReviewLevel('center');}:undefined}] : []),
+    {label:'审阅中心',current:reviewLevel==='center'&&reviewScope==='all',onClick:reviewLevel==='center'&&reviewScope==='all'?undefined:()=>openReviewCenter()},
+    ...((reviewLevel==='workspace'?flow.active.project:flow.db.projects.find(p=>p.id===reviewScope)) ? [{label:(reviewLevel==='workspace'?flow.active.project:flow.db.projects.find(p=>p.id===reviewScope)).name,current:reviewLevel==='center',onClick:reviewLevel==='workspace'?()=>openReviewCenter(flow.active.project.id):undefined}] : []),
     ...(reviewLevel==='workspace' && flow.active.task ? [{label:flow.active.task.name,current:true}] : [])
   ] : [{label:({today:'今日',calendar:'日历',feedback:'修改意见',settings:'设置'})[view],current:true}];
-  if (widgets) return <WidgetPreview flow={flow} />;
-  return <div className="app">
+  if (widgets) return <ColorProvider flow={flow}><WidgetPreview flow={flow} /></ColorProvider>;
+  return <ColorProvider flow={flow}><div className="app">
     <TitleBar query={query} setQuery={setQuery} flow={flow} onProject={openProject} onTask={openTask} />
     <NavRail view={view} setView={changeView} />
     <div className="app-content">
-      {view === 'projects' ? <ProjectExplorer flow={flow} query={query} onNewProject={openNewProject} onNewTask={() => {setCreateDate('');setCreateMode('task');}} onProject={() => enterProjectLevel('detail')} onTask={() => enterProjectLevel('task')} /> : null}
-      {view === 'review' ? <ReviewExplorer flow={flow} query={query} onOpen={openReview} onProject={id=>{setReviewScope(id);setReviewLevel('center');}} /> : null}
+      {view === 'projects' ? <ProjectExplorer flow={flow} query={query} onNewProject={openNewProject} onNewTask={() => {setCreateDate('');setCreateMode('task');}} onProject={openProject} onTask={openTask} /> : null}
+      {view === 'review' ? <ReviewExplorer flow={flow} query={query} onOpen={openReview} onProject={openReviewCenter} /> : null}
       <section className="main-surface">
         <div className="workspace-path"><Breadcrumbs items={pathItems}/><Button className="workspace-back" icon="left" aria-label="返回上一页" title={returnStack.length ? '返回来源页面' : canGoBack ? '返回上一级' : '暂无上一页'} disabled={!canGoBack} onClick={goBack}>返回</Button></div>
         <div className="workspace-content">
@@ -90,5 +96,5 @@ export default function App() {
     {versionDialog ? <Modal title="新增版本" onClose={() => setVersionDialog(false)} footer={<><Button onClick={() => { flow.addVersion({ inherit: false }); setVersionDialog(false); }}>建立空版本</Button><Button variant="primary" onClick={() => { flow.addVersion({ inherit: true }); setVersionDialog(false); }}>继承未完成意见</Button></>}><p className="dialog-copy">将创建 V{Math.max(0,...flow.active.task.versions.map(v=>Number(v.name.replace(/\D/g,''))||0))+1}。可以建立空版本，也可以把当前版本未完成的修改意见带入。</p></Modal> : null}
     {flow.deletedItem ? <div className="undo-notice" role="status">修改意见已删除 <Button onClick={flow.undoDeleteItem}>撤销</Button></div> : null}
     {toast ? <div className={`toast ${toast.type}`}><Icon name={toast.type === 'ok' ? 'check' : 'close'} />{toast.message}</div> : null}
-  </div>;
+  </div></ColorProvider>;
 }

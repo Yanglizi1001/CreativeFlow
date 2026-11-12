@@ -2,6 +2,7 @@ node_modules/
 .pnpm-store/
 dist/
 release/
+backups/
 package-desktop/dist/
 package-desktop/electron/
 .demo-build-profile/

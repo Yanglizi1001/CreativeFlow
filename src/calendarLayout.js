@@ -1,10 +1,9 @@
 import { dateKey, parseDate, weekBounds } from './dates';
+import { scheduleColor } from './colors';
 export const taskPeriod = task => ({start:task.start || task.project?.start || task.due || task.project?.due, end:task.due || task.project?.due});
 export const taskOnDate = (task,day) => {const {start,end}=taskPeriod(task);return Boolean(day&&start&&end&&start<=day&&end>=day);};
 export function taskColor(task) {
-  const palette=['#2563c6','#8b4eb6','#087f8c','#b65f17','#bd4975','#397c39','#6555ba','#ae572f'];
-  const hash=[...`${task.project?.id}/${task.id}`].reduce((n,c)=>(n*31+c.charCodeAt(0))>>>0,0);
-  return palette[hash%palette.length];
+  return scheduleColor(task);
 }
 export function calendarWeeks(value,tasks) {
  const first=value.slice(0,8)+'01',firstDay=weekBounds(first)[0];const last=new Date(parseDate(first));last.setMonth(last.getMonth()+1);last.setDate(0);
