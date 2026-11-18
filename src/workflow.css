@@ -1,0 +1,44 @@
+.workspace-path { gap: 10px; }
+/* Keep the shared navigation/menu row reachable while a non-modal inspector is open. */
+.drawer-scrim { top: 83px; }
+.workspace-path>.breadcrumbs { flex: 1; min-width: 0; }
+.workspace-path>.workspace-back { flex: none; margin-left: 0; }
+.workspace-path .app-menu-trigger, .history-buttons .button { flex: none; width: 30px; min-width: 30px; height: 28px; padding: 5px; border-color: transparent; background: transparent; box-shadow: none; }
+.workspace-path .app-menu-trigger:hover, .history-buttons .button:not(:disabled):hover { background: var(--hover,#eeedf2); }
+.history-buttons { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+.workflow-menu { position: fixed; z-index: 1600; overflow-y: auto; padding: 6px; border: 1px solid var(--line,#dedbe4); border-radius: 12px; background: rgba(252,251,254,.97); box-shadow: 0 12px 36px #20152a24,0 2px 8px #20152a0a; backdrop-filter: blur(22px); }
+.workflow-menu .menu-group-label { padding: 9px 9px 5px; font-size: 11px; color: var(--muted,#88818e); }
+.workflow-menu .menu-group-label:not(:first-child) { margin-top: 4px; border-top: 1px solid var(--line,#dedbe4); }
+.workflow-menu>button { display: grid; grid-template-columns: minmax(0,1fr) auto; width: 100%; text-align: left; border: 0; background: transparent; border-radius: 7px; padding: 7px 9px; min-height: 32px; color: var(--text,#302c36); }
+.workflow-menu>button>span { display: flex; align-items: center; gap: 8px; }
+.workflow-menu>button small { grid-column: 1/-1; padding-top: 2px; font-size: 11px; color: var(--muted,#88818e); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workflow-menu>button:not(:disabled):hover,.workflow-menu>button:focus-visible { background: #eae6ef; outline: none; }
+.workflow-menu>button:disabled { opacity: .42; cursor: not-allowed; }
+.workflow-menu kbd { align-self: center; color: var(--muted,#88818e); font: 10px system-ui; }
+.create-actions { display: inline-flex; align-items: stretch; gap: 3px; flex: none; }
+.create-actions>.menu-trigger { width: 30px; min-width: 30px; padding: 5px; }
+.creation-project { display: flex; align-items: end; gap: 8px; }
+.creation-project>label { min-width: 0; flex: 1; }
+.creation-project>.button { flex: none; height: 33px; }
+.creation-file { display: flex; align-items: center; gap: 8px; margin-top: 6px; min-width: 0; }
+.creation-file>span { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--muted,#88818e); font-size: 12px; }
+.creation-file>.button { flex: none; }
+.creation-context { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: #f5f3f8; border-radius: 8px; overflow-wrap: anywhere; }
+.creation-context>small,.field-label { font-size: 12px; color: var(--muted,#88818e); }
+.inherit-choice { display: flex!important; align-items: center; gap: 8px; }
+.form-error { color: #b32a42; font-size: 12px; margin: 0; }
+.shortcut-guide { font-size: 13px; line-height: 1.8; }
+.shortcut-guide kbd { font: 12px system-ui; background: #eeeaf3; padding: 3px 6px; border-radius: 4px; }
+.review-inline-meta .review-add-version { align-self: flex-start; margin-top: 8px; }
+.review-head-actions { flex-wrap: wrap; }
+.review-workspace-head { flex-wrap: wrap; row-gap: 8px; height: auto; }
+.toast { max-width: min(720px,calc(100vw - 36px)); white-space: normal; }
+.toast>.button { margin-left: 10px; flex: none; }
+.widget-surface>header .history-buttons { margin-left: auto; }
+.widget-surface>header .history-buttons .button { padding: 3px; width: 26px; min-width: 26px; height: 26px; }
+@media(max-width:1000px) {
+ .workspace-path { padding-left: 16px; padding-right: 16px; gap: 6px; }
+ .review-workspace-head { padding-top: 10px; padding-bottom: 10px; }
+ .review-head-actions { width: 100%; justify-content: flex-start; margin-left: 0; }
+ .review-workspace .review-step-buttons { flex-wrap: nowrap; }
+}

@@ -1,11 +1,14 @@
+import { PopupMenu } from './WorkflowControls';
 import React, { useEffect, useRef, useState } from 'react';
 import { APP_VERSION } from './version';
 import { countItems } from './data';
 import { AcrylicSelect, Button, ExplorerPanel, Icon, Mark, StatusTag, TypeIcon } from './ui';
 
-export function TitleBar({ query, setQuery, flow, onProject, onTask }) {
+export function TitleBar({ query, setQuery, flow, onProject, onTask, menuItems, onClose }) {
   const api = window.creativeFlowWindow;
   const headerRef = useRef(null);
+  const [maximized,setMaximized]=useState(false);
+  useEffect(()=>{let live=true;const off=api?.onWindowStateChanged?.(state=>{if(live)setMaximized(state.maximized);});api?.getWindowState?.().then(state=>{if(live)setMaximized(state.maximized);}).catch(()=>{});return()=>{live=false;off?.();};},[]);
   useEffect(() => {
     if (!query.trim()) return;
     const close = event => { if (!headerRef.current?.contains(event.target)) setQuery(''); };
@@ -19,9 +22,9 @@ export function TitleBar({ query, setQuery, flow, onProject, onTask }) {
     ...project.tasks.filter(task=>task.name.includes(query) || task.versions.some(v=>v.lists.some(l=>l.items.some(i=>i.text.includes(query))))).map(task=>({project,task,label:task.name}))
   ]).slice(0,12) : [];
   return <header ref={headerRef} className="titlebar">
-    <div className="brand"><Mark /><span>创作流</span><small className="beta-badge" title={APP_VERSION}>BETA</small></div>
+    <div className="brand"><Mark /><PopupMenu className="brand-menu" label="应用菜单" icon={null} items={menuItems}>创作流<Icon name="down" size={12}/></PopupMenu><small className="beta-badge" title={APP_VERSION}>BETA</small></div>
     <label className="global-search"><Icon name="search" /><input aria-label="全局搜索" value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索项目、任务或修改意见…" /></label>
-    {query.trim() ? <div className="search-results">{matches.map(row=><button key={row.task?.id || row.project.id} onClick={()=>{row.task ? onTask(row.project.id,row.task.id) : onProject(row.project.id);setQuery('');}}><TypeIcon type={row.task?.type || row.project.type}/><span>{row.label}<small>{row.task ? row.project.name : '项目'}</small></span><Icon name="chevron"/></button>)}{!matches.length ? <p>没有匹配的项目、任务或修改意见</p> : null}<button onClick={()=>setQuery('')}>关闭搜索</button></div> : null}<div className="window-controls"><button title="最小化到任务栏" aria-label="最小化到任务栏" onClick={() => api?.minimize()}>—</button><button title="最大化或还原" aria-label="最大化或还原" onClick={() => api?.toggleMaximize()}>□</button><button className="close" title="关闭窗口" aria-label="关闭窗口" onClick={() => api?.close()}>×</button></div>
+    {query.trim() ? <div className="search-results">{matches.map(row=><button key={row.task?.id || row.project.id} onClick={()=>{row.task ? onTask(row.project.id,row.task.id) : onProject(row.project.id);setQuery('');}}><TypeIcon type={row.task?.type || row.project.type}/><span>{row.label}<small>{row.task ? row.project.name : '项目'}</small></span><Icon name="chevron"/></button>)}{!matches.length ? <p>没有匹配的项目、任务或修改意见</p> : null}<button onClick={()=>setQuery('')}>关闭搜索</button></div> : null}<div className="window-controls"><button title="最小化到任务栏" aria-label="最小化到任务栏" onClick={() => api?.minimize()}><WindowGlyph kind="minimize"/></button><button title={maximized?"还原":"最大化"} aria-label={maximized?"还原窗口":"最大化窗口"} onClick={() => api?.toggleMaximize()}><WindowGlyph kind={maximized?"restore":"maximize"}/></button><button className="close" title="关闭窗口" aria-label="关闭窗口" onClick={() => onClose?onClose():api?.close()}><WindowGlyph kind="close"/></button></div>
   </header>;
 }
 
@@ -41,28 +44,7 @@ export function ProjectExplorer({ flow, query, onNewProject, onNewTask, onProjec
   </ExplorerPanel>;
 }
 
-export function CreateForm({ mode, flow, onClose, onCreated, initialDate }) {
-  const [form, setForm] = useState({ name: '', taskName: '', type: '视频', start: '', due: initialDate || new Date().toLocaleDateString('sv-SE'), description: '', status: '前期策划', projectStatus: '计划中' });
-  const custom = flow.db.preferences?.customOptions || {};
-  const makeOptions = (defaults, additions, kind) => [...new Set([...defaults, ...(additions || [])])].map(value => ({ value, label: value, tag: true, kind }));
-  const typeOptions = makeOptions(['视频', '图片', 'PPT'], custom.projectTypes, 'type');
-  const stageOptions = makeOptions(['前期策划', '中期拍摄', '后期制作', '修改中', '内部审核', '客户审核'], custom.taskStages, 'stage');
-  const statusOptions = makeOptions(['计划中', '进行中', '已暂停', '已完成'], custom.projectStatuses, 'project');
-  const update = event => setForm(current => ({ ...current, [event.target.name]: event.target.value }));
-  const submit = event => {
-    event.preventDefault();
-    if (!form.name.trim()) return;
-    if(form.start && form.due && form.start>form.due){alert('开始日期不能晚于截止日期');return;}
-    if(mode==='task' && ((form.start && flow.active.project.start && form.start<flow.active.project.start)||(form.due && flow.active.project.due && form.due>flow.active.project.due)) && !confirm('任务超出项目周期，是否扩展项目周期并创建？'))return;
-    if (mode === 'project') flow.addProject({...form,name:form.name.trim()}); else flow.addTask({...form,name:form.name.trim()});
-    onCreated?.();
-    onClose();
-  };
-  return <form id="create-form" className="form-grid" onSubmit={submit}>
-    <label className="span-2">{mode === 'project' ? '项目名称' : '任务名称'}<input autoFocus required name="name" value={form.name} onChange={update} placeholder={mode === 'project' ? '例如：新品发布会视频' : '例如：30 秒主宣传片'} /></label>
-    {mode === 'project' ? <label className="span-2">首个任务<input name="taskName" value={form.taskName} onChange={update} placeholder="例如：30 秒主宣传片" /></label> : null}
-    <label className="span-2">类型<AcrylicSelect value={form.type} options={typeOptions} label="项目类型" creatable createLabel="输入新项目类型…" onChange={value => setForm(current => ({ ...current, type: value }))} onCreate={value => { flow.addCustomOption('projectTypes', value); setForm(current => ({ ...current, type: value })); }} renderValue={value => <StatusTag value={value} kind="type" compact />} /></label>
-    <label>开始日期<input type="date" name="start" value={form.start} max={form.due || undefined} onChange={update}/></label><label>截止日期<input min={form.start || undefined} type="date" name="due" value={form.due} onChange={update} /></label>
-    {mode === 'project' ? <><label className="span-2">项目状态<AcrylicSelect value={form.projectStatus} options={statusOptions} label="项目状态" creatable createLabel="输入新项目状态…" onChange={value => setForm(current => ({ ...current, projectStatus: value }))} onCreate={value => { flow.addCustomOption('projectStatuses', value); setForm(current => ({ ...current, projectStatus: value })); }} renderValue={value => <StatusTag value={value} kind="project" compact />} /></label><label className="span-2">项目说明<textarea name="description" value={form.description} onChange={update} /></label></> : <label className="span-2">当前阶段<AcrylicSelect value={form.status} options={stageOptions} label="当前阶段" creatable createLabel="输入新任务阶段…" onChange={value => setForm(current => ({ ...current, status: value }))} onCreate={value => { flow.addCustomOption('taskStages', value); setForm(current => ({ ...current, status: value })); }} renderValue={value => <StatusTag value={value} compact />} /></label>}
-  </form>;
+function WindowGlyph({kind}) {
+ const paths={minimize:'M1 6.5h10',maximize:'M1.5 1.5h9v9h-9z',restore:'M3.5 3.5v-2h7v7h-2M1.5 3.5h7v7h-7z',close:'m1.5 1.5 9 9m0-9-9 9'};
+ return <svg className="window-glyph" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1" aria-hidden="true"><path d={paths[kind]}/></svg>;
 }

@@ -1,22 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { APP_STORAGE_KEY, cloneSeedData, uid } from './data';
-import { validDatabase } from './validateDatabase';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { workStore } from './workStore';
+import { cloneSeedData, uid } from './data';
 import { COLOR_PALETTE, allocateTaskColor, migrateColors } from './colors';
-
-function loadDatabase() {
-  let stored;
-  try {
-    stored = localStorage.getItem(APP_STORAGE_KEY);
-    if (!stored) return migrateColors(cloneSeedData(),false);
-    const parsed = JSON.parse(stored);
-    if (!validDatabase(parsed)) throw new Error('invalid database');
-    return migrateColors({ ...parsed, preferences: { ...parsed.preferences, customOptions: { projectStatuses: [], projectTypes: [], taskStages: [], ...(parsed.preferences?.customOptions || {}) } } });
-  } catch {
-    const next=migrateColors(cloneSeedData(),false);
-    if(stored) { try {localStorage.setItem(APP_STORAGE_KEY+'-recovery',stored);next.preferences.recoveryAvailable=true;} catch {} }
-    return next;
-  }
-}
 
 function activityTime() {
   const now = new Date();
@@ -32,28 +17,15 @@ function appendActivity(project, text) {
 }
 
 export function useCreativeFlow() {
-  const [db, setDb] = useState(loadDatabase);
+  const {db,history,saveStatus}=useSyncExternalStore(workStore.subscribe,workStore.getSnapshot);
+  const setDb=(updater,label='更新工作数据',options)=>workStore.change(updater,label,options).catch(()=>null);
   const [deletedItem, setDeletedItem] = useState(null);
-  const [saveStatus, setSaveStatus] = useState('已保存');
+
   const [selection, setSelection] = useState(() => {
     const project = db.projects[0];
     return { projectId: project?.id, taskId: project?.tasks[0]?.id, versionId: project?.tasks[0]?.versions.at(-1)?.id, listId: project?.tasks[0]?.versions.at(-1)?.lists.at(-1)?.id };
   });
 
-  useEffect(() => {
-    setSaveStatus('保存中');
-    const save = () => {
-      try { localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(db)); setSaveStatus('已保存'); }
-      catch { setSaveStatus('保存失败，请导出备份'); }
-    };
-    save();
-  }, [db]);
-
-  useEffect(() => {
-    const sync = event => { if (event.key === APP_STORAGE_KEY && event.newValue) { try { const next = JSON.parse(event.newValue); if(validDatabase(next)) setDb(migrateColors(next)); } catch {} } };
-    window.addEventListener('storage', sync);
-    return () => window.removeEventListener('storage', sync);
-  }, []);
   const active = useMemo(() => {
     const project = db.projects.find(entry => entry.id === selection.projectId) ?? db.projects[0];
     const task = project?.tasks.find(entry => entry.id === selection.taskId) ?? project?.tasks[0];
@@ -93,18 +65,21 @@ export function useCreativeFlow() {
   const updateProjectAt = (projectId, updater, activityText = '') => setDb(current => ({
     ...current,
     projects: current.projects.map(project => project.id === projectId ? appendActivity(updater(project), activityText) : project)
-  }));
+  }),activityText || '更新项目信息');
   const updateProject = (updater, activityText = '') => updateProjectAt(active.project?.id, updater, activityText);
   const updateTask = (updater, activityText = '') => updateProject(project => ({ ...project, tasks: project.tasks.map(task => task.id === active.task?.id ? updater(task) : task) }), activityText);
   const updateVersion = (updater, activityText = '') => updateTask(task => ({ ...task, versions: task.versions.map(version => version.id === active.version?.id ? updater(version) : version) }), activityText);
   const updateList = (updater, activityText = '') => updateVersion(version => ({ ...version, lists: version.lists.map(list => list.id === active.list?.id ? updater(list) : list) }), activityText);
   const recordActivity = (text, projectId = active.project?.id) => updateProjectAt(projectId, project => project, text);
 
-  const addProject = values => {
+  const addProject = async values => {
     const taskId = uid('task'); const versionId = uid('version');
     const project = { id: uid('project'), name: values.name, description: values.description || '', notes: '', status: values.projectStatus || '计划中', type: values.type || '视频', start: values.start || '', due: values.due || '', color: values.color || COLOR_PALETTE[db.projects.length % COLOR_PALETTE.length], defaultColor: COLOR_PALETTE[db.projects.length % COLOR_PALETTE.length], activities: [{ id: uid('activity'), at: activityTime(), text: '创建了项目' }], tasks: [{ id: taskId, color: COLOR_PALETTE[0], defaultColor: COLOR_PALETTE[0], name: values.taskName || '首个任务', type: values.type || '视频', status: '前期策划', start: values.start || '', due: values.due || '', versions: [{ id: versionId, name: 'V1', status: '进行中', createdAt: new Date().toISOString().slice(0, 10), file: null, lists: [] }] }] };
-    setDb(current => ({ ...current, projects: [...current.projects, project] }));
+    if(values.empty)project.tasks=[];
+    const saved=await setDb(current => ({ ...current, projects: [...current.projects, project] }),`新建项目「${project.name}」`);
+    if(saved===null)return null;
     setSelection({ projectId: project.id, taskId, versionId, listId: undefined });
+    return project;
   };
   const deleteProject = (projectId = active.project?.id) => {
     if (!projectId) return false;
@@ -113,16 +88,19 @@ export function useCreativeFlow() {
     const fallbackProject = remaining[0];
     const fallbackTask = fallbackProject?.tasks[0];
     const fallbackVersion = fallbackTask?.versions.at(-1);
-    setDb(current => ({ ...current, projects: current.projects.filter(project => project.id !== projectId) }));
+    setDb(current => ({ ...current, projects: current.projects.filter(project => project.id !== projectId) }),`删除项目「${db.projects.find(p=>p.id===projectId)?.name}」`);
     setSelection({ projectId: fallbackProject?.id, taskId: fallbackTask?.id, versionId: fallbackVersion?.id, listId: fallbackVersion?.lists[0]?.id });
     return true;
   };
-  const addTask = values => {
-    const versionId = uid('version');
-    const color=allocateTaskColor(active.project.tasks);
-    const task = { id: uid('task'), color, defaultColor:color, name: values.name, type: values.type || active.project.type, status: values.status || '前期策划', start: values.start || '', due: values.due || active.project.due, versions: [{ id: versionId, name: 'V1', status: '进行中', createdAt: new Date().toISOString().slice(0, 10), file: null, lists: [] }] };
-    updateProject(project => ({ ...project, start:task.start && (!project.start || task.start<project.start)?task.start:project.start, due:task.due && (!project.due || task.due>project.due)?task.due:project.due, tasks: [...project.tasks, task] }), `添加了任务「${task.name}」`);
-    setSelection(current => ({ ...current, taskId: task.id, versionId, listId: undefined }));
+  const addTask = async values => {
+    const project=db.projects.find(p=>p.id===(values.projectId || active.project?.id));
+    if(!project)return null;
+    const versionId=uid('version'),color=allocateTaskColor(project.tasks);
+    const task={id:uid('task'),color,defaultColor:color,name:values.name,type:values.type||project.type,status:values.status||'前期策划',start:values.start||'',due:values.due||project.due,versions:[{id:versionId,name:'V1',status:'进行中',createdAt:new Date().toLocaleDateString('sv-SE'),file:values.file||null,lists:[]}]};
+    const saved=await updateProjectAt(project.id,p=>({...p,start:task.start&&(!p.start||task.start<p.start)?task.start:p.start,due:task.due&&(!p.due||task.due>p.due)?task.due:p.due,tasks:[...p.tasks,task]}),`添加了任务「${task.name}」`);
+    if(saved===null)return null;
+    setSelection({projectId:project.id,taskId:task.id,versionId,listId:undefined});
+    return {projectId:project.id,task};
   };
   const deleteTask = (projectId = active.project?.id, taskId = active.task?.id) => {
     const project = db.projects.find(entry => entry.id === projectId);
@@ -134,12 +112,16 @@ export function useCreativeFlow() {
     setSelection({ projectId, taskId: fallbackTask?.id, versionId: fallbackVersion?.id, listId: fallbackVersion?.lists[0]?.id });
     return true;
   };
-  const addVersion = ({ inherit = true } = {}) => {
-    const previous = active.version;
-    const nextVersionNumber = Math.max(0, ...active.task.versions.map(entry => Number.parseInt(entry.name.replace(/\D/g, ''), 10) || 0)) + 1;
-    const version = { id: uid('version'), name: `V${nextVersionNumber}`, status: '进行中', createdAt: new Date().toISOString().slice(0, 10), file: null, lists: inherit && previous ? previous.lists.map(source => ({ id: uid('list'), name: source.name, items: source.items.filter(row => !row.done).map(row => ({ ...row, id: uid('item') })) })) : [] };
-    updateTask(task => ({ ...task, versions: [...task.versions, version] }), `创建了版本 ${version.name}`);
-    setSelection(current => ({ ...current, versionId: version.id, listId: version.lists[0]?.id }));
+  const addVersion = async ({inherit=false,projectId=active.project?.id,taskId=active.task?.id,sourceVersionId=active.version?.id,name,file=null}={}) => {
+    const project=db.projects.find(p=>p.id===projectId),task=project?.tasks.find(t=>t.id===taskId);
+    if(!task)return null;
+    const previous=task.versions.find(v=>v.id===sourceVersionId);
+    const number=Math.max(0,...task.versions.map(v=>Number.parseInt(v.name.replace(/\D/g,''),10)||0))+1;
+    const version={id:uid('version'),name:name?.trim()||`V${number}`,status:'进行中',createdAt:new Date().toLocaleDateString('sv-SE'),file,lists:inherit&&previous?previous.lists.map(source=>({id:uid('list'),name:source.name,items:source.items.filter(row=>!row.done).map(row=>({...row,id:uid('item'),done:false,status:'todo'}))})):[]};
+    const saved=await updateProjectAt(projectId,p=>({...p,tasks:p.tasks.map(t=>t.id===taskId?{...t,versions:[...t.versions,version]}:t)}),`创建了版本 ${version.name}`);
+    if(saved===null)return null;
+    setSelection({projectId,taskId,versionId:version.id,listId:version.lists[0]?.id});
+    return version;
   };
   const deleteVersion = (versionId = active.version?.id) => {
     const task = active.task;
@@ -187,39 +169,19 @@ export function useCreativeFlow() {
       }))
     }), item?.done ? '重新打开了修改意见' : '完成了修改意见');
   };
-  const editItemAt = (projectId, taskId, versionId, listId, itemId, patch) => setDb(current => ({
-    ...current,
-    projects: current.projects.map(project => project.id !== projectId ? project : ({
-      ...project,
-      tasks: project.tasks.map(task => task.id !== taskId ? task : ({
-        ...task,
-        versions: task.versions.map(version => version.id !== versionId ? version : ({
-          ...version,
-          lists: version.lists.map(list => list.id !== listId ? list : ({
-            ...list,
-            items: list.items.map(row => row.id !== itemId ? row : ({ ...row, ...patch }))
-          }))
-        }))
-      }))
-    }))
-  }));
-  const editItem = (itemId, patch) => updateList(list => ({ ...list, items: list.items.map(row => row.id === itemId ? { ...row, ...patch } : row) }));
-  const removeItem = itemId => {
-    const index = active.list?.items.findIndex(item => item.id === itemId);
-    if (index == null || index < 0) return;
-    setDeletedItem({ projectId: active.project.id, taskId: active.task.id, versionId: active.version.id, listId: active.list.id, index, item: active.list.items[index] });
-    updateList(list => ({ ...list, items: list.items.filter(row => row.id !== itemId) }), '删除了修改意见');
+  const editItemAt=(projectId,taskId,versionId,listId,itemId,patch,expectedText)=>setDb(current=>{
+    const item=current.projects.find(p=>p.id===projectId)?.tasks.find(t=>t.id===taskId)?.versions.find(v=>v.id===versionId)?.lists.find(l=>l.id===listId)?.items.find(i=>i.id===itemId);
+    // Check the latest record inside the shared write lock; never revive a deleted opinion.
+    if(!item||(expectedText!==undefined&&item.text!==expectedText))return current;
+    return {...current,projects:current.projects.map(p=>p.id!==projectId?p:appendActivity({...p,tasks:p.tasks.map(t=>t.id!==taskId?t:{...t,versions:t.versions.map(v=>v.id!==versionId?v:{...v,lists:v.lists.map(l=>l.id!==listId?l:{...l,items:l.items.map(i=>i.id===itemId?{...i,...patch}:i)})})})},'编辑了修改意见'))};
+  },'编辑了修改意见');
+  const editItem = (itemId, patch) => updateList(list => ({ ...list, items: list.items.map(row => row.id === itemId ? { ...row, ...patch } : row) }),'编辑了修改意见');
+  const removeItemAt=async(projectId,taskId,versionId,listId,itemId)=>{
+    const token=await updateVersionAt(projectId,taskId,versionId,version=>({...version,lists:version.lists.map(list=>list.id===listId?{...list,items:list.items.filter(row=>row.id!==itemId)}:list)}),'删除了修改意见');
+    if(token)setDeletedItem({token});return token;
   };
-  const undoDeleteItem = () => {
-    if (!deletedItem) return;
-    const { projectId, taskId, versionId, listId, index, item } = deletedItem;
-    updateVersionAt(projectId, taskId, versionId, version => ({ ...version, lists: version.lists.map(list => {
-      if (list.id !== listId || list.items.some(row => row.id === item.id)) return list;
-      const items = [...list.items]; items.splice(Math.min(index, items.length), 0, item);
-      return { ...list, items };
-    }) }), '撤销删除修改意见');
-    setDeletedItem(null);
-  };
+  const removeItem=itemId=>removeItemAt(active.project.id,active.task.id,active.version.id,active.list.id,itemId);
+  const undoDeleteItem=()=>{if(deletedItem)workStore.travel('undo',deletedItem.token).catch(()=>{});setDeletedItem(null);};
   useEffect(() => { if (!deletedItem) return; const timer = setTimeout(() => setDeletedItem(null), 10000); return () => clearTimeout(timer); }, [deletedItem]);
   const importItems = rows => updateList(list => ({ ...list, items: [...list.items, ...rows.map(row => ({ ...row, id: uid('item'), done: false, status: 'todo' }))] }), `导入了 ${rows.length} 条修改意见`);
   const setFile = file => updateVersion(version => ({ ...version, file, duration: undefined, reviewPosition: 0 }), `关联了版本文件「${file?.name || '未命名文件'}」`);
@@ -232,22 +194,26 @@ export function useCreativeFlow() {
     const currentOptions = current.preferences?.customOptions?.[kind] || [];
     if (currentOptions.includes(value)) return current;
     return { ...current, preferences: { ...current.preferences, customOptions: { projectStatuses: [], projectTypes: [], taskStages: [], ...(current.preferences?.customOptions || {}), [kind]: [...currentOptions, value] } } };
-  });
+  },'添加自定义标签');
   const removeCustomOption = (kind, value) => setDb(current => {
     const currentOptions = current.preferences?.customOptions?.[kind] || [];
     return { ...current, preferences: { ...current.preferences, customOptions: { projectStatuses: [], projectTypes: [], taskStages: [], ...(current.preferences?.customOptions || {}), [kind]: currentOptions.filter(option => option !== value) } } };
-  });
+  },'删除自定义标签');
   const updateVersionAt = (projectId, taskId, versionId, updater, activityText = '') => updateProjectAt(projectId, project => ({ ...project, tasks: project.tasks.map(task => task.id !== taskId ? task : ({ ...task, versions: task.versions.map(version => version.id === versionId ? updater(version) : version) })) }), activityText);
   const addItemAt = (projectId, taskId, versionId, listId, text, time = '') => updateVersionAt(projectId, taskId, versionId, version => ({ ...version, lists: version.lists.map(list => list.id !== listId ? list : ({ ...list, items: [...list.items, { id: uid('item'), text, time, done: false, status: 'todo' }] })) }), '添加了修改意见');
-  const addReviewItem = (projectId, taskId, versionId, listId, text, time = '') => {
+  const addReviewItem = async (projectId, taskId, versionId, listId, text, time = '') => {
     const createdListId = listId || uid('list');
     const createdItem = { id: uid('item'), text, time, done: false, status: 'todo' };
-    updateVersionAt(projectId, taskId, versionId, version => listId ? ({ ...version, lists: version.lists.map(list => list.id !== listId ? list : ({ ...list, items: [...list.items, createdItem] })) }) : ({ ...version, lists: [...version.lists, { id: createdListId, name: '审阅意见', items: [createdItem] }] }), `${time ? `在 ${time} ` : ''}添加了审阅意见`);
+    const saved=await updateVersionAt(projectId, taskId, versionId, version => listId ? ({ ...version, lists: version.lists.map(list => list.id !== listId ? list : ({ ...list, items: [...list.items, createdItem] })) }) : ({ ...version, lists: [...version.lists, { id: createdListId, name: '审阅意见', items: [createdItem] }] }), `${time ? `在 ${time} ` : ''}添加了审阅意见`);
+    if(saved===null)return null;
     setSelection({ projectId, taskId, versionId, listId: createdListId });
+    return {listId:createdListId,itemId:createdItem.id};
   };
   const setReviewPosition = (projectId, taskId, versionId, seconds) => updateVersionAt(projectId, taskId, versionId, version => ({ ...version, reviewPosition: Math.max(0, Math.round(seconds)), reviewedAt: new Date().toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) }));
-  const reset = () => { const next = migrateColors(cloneSeedData(),false); setDb(next); localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(next)); window.location.reload(); };
-  const replaceDatabase = database => { const next=migrateColors(database); setDb(next); localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(next)); window.location.reload(); };
+  const reset=async()=>{await workStore.replace(migrateColors(cloneSeedData(),false));window.location.reload();};
+  const replaceDatabase=async database=>{await workStore.replace(database);window.location.reload();};
+  const undo=()=>workStore.travel('undo').catch(()=>null),redo=()=>workStore.travel('redo').catch(()=>null);
 
-  return { db, deletedItem, undoDeleteItem, saveStatus, setDb, selection, active, chooseProject, chooseTask, chooseVersion, chooseList, selectPath, updateProjectAt, updateProject, updateTask, updateVersion, updateVersionAt, recordActivity, addProject, deleteProject, addTask, deleteTask, addVersion, deleteVersion, addList, deleteList, addItem, addItemAt, addReviewItem, toggleItem, toggleItemAt, editItem, editItemAt, removeItem, importItems, setFile, clearFile, setReviewPosition, addCustomOption, removeCustomOption, reset, replaceDatabase };
+
+  return { db, history, undo, redo, flush:workStore.flush, deletedItem:history.past.at(-1)?.id===deletedItem?.token?deletedItem:null, undoDeleteItem, saveStatus, setDb, selection, active, chooseProject, chooseTask, chooseVersion, chooseList, selectPath, updateProjectAt, updateProject, updateTask, updateVersion, updateVersionAt, recordActivity, addProject, deleteProject, addTask, deleteTask, addVersion, deleteVersion, addList, deleteList, addItem, addItemAt, addReviewItem, toggleItem, toggleItemAt, editItem, editItemAt, removeItemAt, removeItem, importItems, setFile, clearFile, setReviewPosition, addCustomOption, removeCustomOption, reset, replaceDatabase };
 }

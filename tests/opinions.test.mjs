@@ -1,0 +1,6 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {isGeneralOpinion,orderedOpinions,opinionPayload,parseOpinionTime} from '../src/opinions.js';
+test('legacy missing time is general, explicit zero time remains a time opinion',()=>{assert(isGeneralOpinion({text:'整体节奏'}));assert(isGeneralOpinion({time:''}));assert(!isGeneralOpinion({time:'00:00'}));});
+test('general opinions appear first without changing stored order or timed order',()=>{const items=[{id:'1',time:'00:03'},{id:'2'},{id:'3',time:'00:01'},{id:'4',time:''}];assert.deepEqual(orderedOpinions(items).map(i=>i.id),['2','4','1','3']);assert.deepEqual(items.map(i=>i.id),['1','2','3','4']);});
+test('switching to general removes time, switching to timed validates format and duration',()=>{assert.deepEqual(opinionPayload('general',' 整体节奏 ','00:09',18).value,{text:'整体节奏',time:'',kind:'general'});assert(opinionPayload('time','镜头','00:61',18).error);assert(opinionPayload('time','镜头','00:19',18).error);assert.equal(opinionPayload('time','开场','00:00',18).value.time,'00:00');assert(opinionPayload('general','  ','',18).error);assert.equal(parseOpinionTime('01:02:03'),3723);assert.equal(parseOpinionTime('1:60:00'),null);});

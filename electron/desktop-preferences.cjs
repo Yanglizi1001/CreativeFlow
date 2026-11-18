@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const defaults = { closeToTray: true, askBeforeClose: true };
+const defaults = { closeToTray: true, askBeforeClose: true, widgetAlwaysOnTop: true };
 function readPreferences(folder) {
   try {
     const data = JSON.parse(fs.readFileSync(path.join(folder, 'desktop-preferences.json'), 'utf8'));

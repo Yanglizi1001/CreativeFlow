@@ -2,7 +2,7 @@ name: Publish Windows beta
 
 on:
   push:
-    branches: ['0.7.0-beta.2']
+    branches: ['0.7.0-beta.3']
   workflow_dispatch:
 
 permissions:
@@ -26,21 +26,19 @@ jobs:
         with:
           node-version: '22'
       - name: Validate version
-        run: node -e "if(require('./package.json').version !== '0.7.0-beta.2') process.exit(1)"
+        run: node -e "if(require('./package.json').version !== '0.7.0-beta.3') process.exit(1)"
       - name: Install locked dependencies
         run: npx --yes pnpm@10.15.1 install --frozen-lockfile --ignore-scripts
       - name: Download Electron runtime
         run: node node_modules/electron/install.js
-      - name: Run color and migration tests
-        run: npm run test:colors
+      - name: Run work-data, history and migration tests
+        run: npm test
       - name: Build application
         run: npm run build
       - name: Prepare desktop package
         run: node scripts/prepare-desktop.cjs
-      - name: Build Windows x64 installer
-        run: node node_modules/electron-builder/out/cli/cli.js --projectDir ./package-desktop --win nsis --x64 '-c.directories.output=../release/ci'
-      - name: Build Windows x64 portable application
-        run: node node_modules/electron-builder/out/cli/cli.js --projectDir ./package-desktop --prepackaged "$env:GITHUB_WORKSPACE/release/ci/win-unpacked" --win portable --x64 '-c.directories.output=../release/ci' '-c.win.artifactName=CreativeFlow-${version}-win-x64.${ext}'
+      - name: Build Windows x64 installer and portable application
+        run: node node_modules/electron-builder/out/cli/cli.js --projectDir ./package-desktop --win nsis portable --x64 '-c.directories.output=../release/ci' '-c.portable.artifactName=CreativeFlow-${version}-win-x64.${ext}' '-c.compression=normal'
       - name: Publish named beta release
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         with:
@@ -49,7 +47,7 @@ jobs:
             const path = require('node:path');
             const crypto = require('node:crypto');
             const version = JSON.parse(fs.readFileSync('package.json', 'utf8')).version;
-            if (version !== '0.7.0-beta.2') throw new Error('Unexpected release version');
+            if (version !== '0.7.0-beta.3') throw new Error('Unexpected release version');
             const owner = context.repo.owner, repo = context.repo.repo;
             const files = [
               `CreativeFlow-Setup-${version}-win-x64.exe`,
@@ -62,6 +60,8 @@ jobs:
             const sums = files.map(file => `${crypto.createHash('sha256').update(fs.readFileSync(path.join(folder, file))).digest('hex')}  ${file}`).join('\n') + '\n';
             fs.writeFileSync(path.join(folder, 'SHA256SUMS.txt'), sums);
             const body = fs.readFileSync(`docs/beta-${version}.md`, 'utf8');
+            fs.copyFileSync(`docs/beta-${version}.md`, path.join(folder, 'Release-Notes.md'));
+            fs.copyFileSync('docs/testing-feedback.md', path.join(folder, 'Feedback-Template.md'));
             try {
               const ref = await github.rest.git.getRef({owner, repo, ref: `tags/${version}`});
               if (ref.data.object.sha !== context.sha) throw new Error('Existing tag points to a different commit; refusing to replace it');
@@ -78,7 +78,7 @@ jobs:
               release = (await github.rest.repos.createRelease({owner, repo, tag_name: version, target_commitish: context.sha, name: version, body, draft: true, prerelease: true})).data;
             }
             const assets = await github.paginate(github.rest.repos.listReleaseAssets, {owner, repo, release_id: release.id});
-            for (const file of [...files, 'SHA256SUMS.txt']) {
+            for (const file of [...files, 'SHA256SUMS.txt', 'Release-Notes.md', 'Feedback-Template.md']) {
               const existing = assets.find(asset => asset.name === file);
               if (existing) await github.rest.repos.deleteReleaseAsset({owner, repo, asset_id: existing.id});
               const data = fs.readFileSync(path.join(folder, file));

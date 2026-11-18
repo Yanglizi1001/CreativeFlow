@@ -6,6 +6,9 @@ import { defaultTagColor, tagColors, validColor } from './colors';
 import { ColorPicker } from './ColorPicker';
 
 const paths = {
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  undo: '<path d="M9 4 4 9l5 5M4 9h10a6 6 0 0 1 0 12"/>',
+  redo: '<path d="m15 4 5 5-5 5m5-5H10a6 6 0 0 0 0 12"/>',
   home: '<path d="M3 11 12 3l9 8v9H15v-7H9v7H3z"/>',
   folder: '<path d="M3 6h7l2 2h9v12H3z"/>',
   calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4m8-4v4M3 10h18"/>',
@@ -170,7 +173,7 @@ export function Modal({ title, children, onClose, footer }) {
   useEffect(() => {
     const previous = document.activeElement;
     const dialog = dialogRef.current;
-    (dialog.querySelector('[autofocus], input, textarea, button') || dialog).focus();
+    (dialog.querySelector('.modal-body input:not([type="checkbox"]):not([type="hidden"]), .modal-body textarea') || dialog.querySelector('button') || dialog).focus();
     const trap = event => {
       if (event.target.closest('[data-color-editor]')) return;
       if (event.key !== 'Tab') return;

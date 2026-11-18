@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { fileURLToPath } = require('url');
 const { readPreferences, writePreferences } = require('./desktop-preferences.cjs');
+const sessionId = require('crypto').randomUUID();
 
 let mainWindow;
 let widgetWindow;
@@ -15,6 +16,7 @@ let quitPending;
 let flushCounter = 0;
 function setDesktopPreferences(patch) {
   desktopPreferences = writePreferences(app.getPath('userData'), desktopPreferences, patch);
+  if (widgetWindow && !widgetWindow.isDestroyed()) widgetWindow.setAlwaysOnTop(desktopPreferences.widgetAlwaysOnTop);
   for (const window of BrowserWindow.getAllWindows()) window.webContents.send('desktop:preferences-changed', desktopPreferences);
   return desktopPreferences;
 }
@@ -97,6 +99,7 @@ function createWindow() {
     icon: path.join(__dirname, 'assets', 'app.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
+      additionalArguments: ['--creative-flow-session=' + sessionId],
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -104,6 +107,9 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   mainWindow.once('ready-to-show', () => mainWindow.show());
+  const publishWindowState=()=>mainWindow?.webContents.send('window:state-changed',{maximized:mainWindow.isMaximized()});
+  mainWindow.on('maximize',publishWindowState);
+  mainWindow.on('unmaximize',publishWindowState);
   mainWindow.on('minimize', () => mainWindow.webContents.send('window:flush-input'));
   mainWindow.on('close', event => { if (!quitting) { event.preventDefault(); void requestClose(); } });
   mainWindow.on('closed', () => { mainWindow = null; if (widgetWindow && !widgetWindow.isDestroyed()) widgetWindow.close(); });
@@ -121,7 +127,7 @@ function createWidgetWindow() {
     minWidth: 440,
     minHeight: 410,
     frame: false,
-    alwaysOnTop: true,
+    alwaysOnTop: desktopPreferences.widgetAlwaysOnTop,
     transparent: true,
     backgroundColor: '#00000000',
     hasShadow: true,
@@ -129,15 +135,22 @@ function createWidgetWindow() {
     icon: path.join(__dirname, 'assets', 'app.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
+      additionalArguments: ['--creative-flow-session=' + sessionId],
       contextIsolation: true,
       nodeIntegration: false
     }
   });
   widgetWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { hash: '/widgets' });
+  widgetWindow.on('close', event => {
+    if (!quitting) { event.preventDefault(); widgetWindow.webContents.send('widget:close-requested'); }
+  });
   widgetWindow.on('closed', () => { widgetWindow = null; });
 }
 
 ipcMain.on('window:minimize', () => { if (mainWindow) { mainWindow.setSkipTaskbar(false); mainWindow.minimize(); } });
+ipcMain.handle('window:state-get', event => ({maximized:BrowserWindow.fromWebContents(event.sender)?.isMaximized()||false}));
+ipcMain.on('window:hide-to-tray', async () => { if(mainWindow){await flushWindow(mainWindow);hideToTray();} });
+ipcMain.on('window:quit', () => { void requestQuit(); });
 ipcMain.handle('desktop:preferences-get', () => desktopPreferences);
 ipcMain.handle('desktop:preferences-set', (_event, patch) => setDesktopPreferences(patch));
 ipcMain.on('window:toggle-maximize', () => {
@@ -147,6 +160,9 @@ ipcMain.on('window:toggle-maximize', () => {
 ipcMain.on('window:close', () => mainWindow?.close());
 ipcMain.on('window:close-current', event => BrowserWindow.fromWebContents(event.sender)?.close());
 ipcMain.on('widget:open', () => createWidgetWindow());
+ipcMain.on('widget:close-confirmed', event => {
+  if (widgetWindow && event.sender === widgetWindow.webContents) widgetWindow.destroy();
+});
 ipcMain.handle('file:select', async () => {
   const result = await dialog.showOpenDialog(mainWindow, { properties: ['openFile'] });
   if (result.canceled || !result.filePaths[0]) return null;

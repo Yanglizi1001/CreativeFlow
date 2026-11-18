@@ -1,0 +1,39 @@
+.titlebar .brand { gap: 6px; width: auto; min-width: 175px; }
+.titlebar .brand-menu { -webkit-app-region: no-drag; height: 30px; padding: 0 7px; border: 0; background: transparent; box-shadow: none; color: var(--ink,#302c36); font-size: 13px; font-weight: 650; gap: 5px; }
+.titlebar .brand-menu:hover,.titlebar .brand-menu[aria-expanded=true] { background: #eae6ee; }
+.titlebar .brand>.app-mark { flex: none; }
+.titlebar .window-controls { align-self: stretch; height: 100%; gap: 0; }
+.titlebar .window-controls>button { display: grid; place-items: center; width: 46px; min-width: 46px; height: 100%; padding: 0; margin: 0; border: 0; border-radius: 0; background: transparent; color: #514b58; -webkit-app-region: no-drag; box-shadow: none; }
+.titlebar .window-controls>button:hover { background: #e7e3eb; }
+.titlebar .window-controls>button:active { background: #dcd7e2; }
+.titlebar .window-controls>button.close:hover { background: #c42b1c; color: white; }
+.titlebar .window-controls>button.close:active { background: #a92317; color: white; }
+.window-glyph { width: 12px; height: 12px; flex: none; stroke-width: 1; }
+.review-note-list { min-height: 80px; flex: 1; overflow-y: auto; }
+.review-note-row { cursor: pointer; min-height: 48px; height: auto!important; }
+.review-note-row>strong { white-space: pre-wrap!important; overflow-wrap: anywhere; line-height: 1.5; padding: 9px 0; }
+.review-note-row .opinion-check { display: flex; align-items: center; }
+.review-opinion-time { border: 0; background: transparent; padding: 3px 0; font-size: 10px; color: var(--blue,#3878cf); cursor: pointer; }
+.general-opinion { display: inline-flex; justify-content: center; border-radius: 4px!important; background: #eee9f4; color: #756187; font-size: 10px; padding: 3px 4px; white-space: nowrap; text-decoration: none!important; }
+.review-note-row:focus-visible { outline: 2px solid #8ba9d3; outline-offset: -2px; }
+.review-notes .review-composer { display: flex; flex-direction: column; align-items: stretch; gap: 9px; flex: none; height: auto; padding: 12px; margin: 0; border: 0; border-top: 1px solid var(--line); background: #fbfafd; }
+.composer-heading,.composer-options,.composer-footer { display: flex; align-items: center; gap: 8px; }
+.composer-heading { justify-content: space-between; }
+.composer-heading strong { font-size: 12px; }
+.composer-heading small,.composer-options>small { color: var(--muted,#88818e); font-size: 10px; }
+.composer-options { flex-wrap: wrap; }
+.composer-options .segmented button { min-width: 68px; padding: 0 6px; font-size: 11px; }
+.composer-options>label { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--muted,#88818e); }
+.review-composer .composer-options input { flex: none; width: 68px; height: 28px; border: 1px solid var(--line); border-radius: 5px; background: white; padding: 0 6px; font-size: 11px; }
+.review-composer>textarea { min-height: 70px; max-height: 160px; height: 76px; resize: vertical; width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid var(--line-strong,#d3cbdc); border-radius: 6px; background: white; color: var(--ink,#302c36); font-family: inherit; font-size: 12px; line-height: 1.6; }
+.review-composer>textarea:focus { outline: 2px solid #d6e2f5; border-color: #87a6d0; }
+.composer-footer { justify-content: flex-end; }
+.review-composer .composer-footer .button { height: 30px; padding: 0 11px; }
+.opinion-context-menu { z-index: 1650; }
+.review-add-hint { flex: none; }
+.app:has(.review-composer) .toast { bottom: auto; top: 92px; }
+@media(max-width:1000px) {
+ .titlebar .brand { min-width: 160px; }
+ .review-notes .review-composer { padding: 10px; }
+ .composer-heading { flex-wrap: wrap; }
+}
