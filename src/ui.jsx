@@ -68,8 +68,8 @@ export function Button({ children, icon, variant = '', className = '', type = 'b
   return <button type={type} className={`button ${variant} ${className}`.trim()} {...props}>{icon ? <Icon name={icon} /> : null}{children}</button>;
 }
 
-export function Check({ checked, onChange, label }) {
-  return <label className="check"><input type="checkbox" checked={checked} onChange={onChange} aria-label={label} /><span>{checked ? <Icon name="check" size={14} /> : null}</span></label>;
+export function Check({ checked, onChange, label,disabled=false }) {
+  return <label className="check"><input type="checkbox" checked={checked} disabled={disabled} onChange={onChange} aria-label={label} /><span>{checked ? <Icon name="check" size={14} /> : null}</span></label>;
 }
 
 const tones = {
@@ -97,10 +97,11 @@ export function TypeIcon({ type, size = 18 }) {
   return <Icon name={type === '图片' ? 'image' : type === 'PPT' ? 'ppt' : 'video'} size={size} />;
 }
 
-export function AcrylicSelect({ value, options, onChange, label, className = '', renderValue, creatable = false, onCreate, createLabel = '添加自定义标签' }) {
+export function AcrylicSelect({ value, options, onChange, label, className = '', renderValue, creatable = false, onCreate, createLabel = '添加自定义标签',disabled=false }) {
   const colors=useColors();
   const colorKind=({'项目状态':'project','版本状态':'version','项目类型':'type','任务类型':'type','项目阶段':'stage','任务阶段':'stage','当前阶段':'stage','筛选阶段':'stage'})[label];
   const [open, setOpen] = useState(false);
+  useEffect(()=>{if(disabled)setOpen(false);},[disabled]);
   const [draft, setDraft] = useState('');
   const [menuStyle, setMenuStyle] = useState({});
   const rootRef = useRef(null);
@@ -155,7 +156,7 @@ export function AcrylicSelect({ value, options, onChange, label, className = '',
     {creatable ? <div className="acrylic-create"><Icon name="plus" size={15} /><input value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); create(); } }} placeholder={createLabel} aria-label={createLabel} /><button type="button" onClick={create} disabled={!draft.trim()} aria-label="确认添加"><Icon name="check" size={15} /></button></div> : null}
   </div> : null;
   return <div className={`acrylic-select ${open ? 'open' : ''} ${className}`} ref={rootRef}>
-    <button ref={triggerRef} type="button" className="acrylic-trigger" aria-label={label} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(current => !current)} onKeyDown={event => {
+    <button disabled={disabled} ref={triggerRef} type="button" className="acrylic-trigger" aria-label={label} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(current => !current)} onKeyDown={event => {
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault(); setOpen(true);
         requestAnimationFrame(() => { const options = menuRef.current?.querySelectorAll('[role="option"]'); const selected = menuRef.current?.querySelector('[aria-selected="true"]'); (selected || options?.[event.key === 'ArrowUp' ? options.length - 1 : 0])?.focus(); });
@@ -167,7 +168,7 @@ export function AcrylicSelect({ value, options, onChange, label, className = '',
   </div>;
 }
 
-export function Modal({ title, children, onClose, footer }) {
+export function Modal({ title, children, onClose, footer,className='' }) {
   useEscape(onClose);
   const dialogRef = useRef(null);
   useEffect(() => {
@@ -186,7 +187,7 @@ export function Modal({ title, children, onClose, footer }) {
     return () => { dialog.removeEventListener('keydown',trap); previous?.focus?.(); };
   }, []);
   return createPortal(<div className="modal-backdrop">
-    <section ref={dialogRef} className="modal" role="dialog" aria-label={title} aria-modal="true" tabIndex="-1"><header><h2>{title}</h2><button onClick={onClose} aria-label="关闭"><Icon name="close" /></button></header><div className="modal-body">{children}</div>{footer ? <footer>{footer}</footer> : null}</section>
+    <section ref={dialogRef} className={`modal ${className}`} role="dialog" aria-label={title} aria-modal="true" tabIndex="-1"><header><h2>{title}</h2><button onClick={onClose} aria-label="关闭"><Icon name="close" /></button></header><div className="modal-body">{children}</div>{footer ? <footer>{footer}</footer> : null}</section>
   </div>, document.body);
 }
 

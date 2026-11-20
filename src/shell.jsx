@@ -4,7 +4,7 @@ import { APP_VERSION } from './version';
 import { countItems } from './data';
 import { AcrylicSelect, Button, ExplorerPanel, Icon, Mark, StatusTag, TypeIcon } from './ui';
 
-export function TitleBar({ query, setQuery, flow, onProject, onTask, menuItems, onClose }) {
+export function TitleBar({ query, setQuery, flow, onSpace, onProject, onTask, menuItems, onClose }) {
   const api = window.creativeFlowWindow;
   const headerRef = useRef(null);
   const [maximized,setMaximized]=useState(false);
@@ -23,6 +23,7 @@ export function TitleBar({ query, setQuery, flow, onProject, onTask, menuItems, 
   ]).slice(0,12) : [];
   return <header ref={headerRef} className="titlebar">
     <div className="brand"><Mark /><PopupMenu className="brand-menu" label="应用菜单" icon={null} items={menuItems}>创作流<Icon name="down" size={12}/></PopupMenu><small className="beta-badge" title={APP_VERSION}>BETA</small></div>
+    <Button className="space-switch" onClick={onSpace} title="切换空间 / 加入公司">{flow.space?.name||'我的项目'}<Icon name="down" size={12}/></Button>
     <label className="global-search"><Icon name="search" /><input aria-label="全局搜索" value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索项目、任务或修改意见…" /></label>
     {query.trim() ? <div className="search-results">{matches.map(row=><button key={row.task?.id || row.project.id} onClick={()=>{row.task ? onTask(row.project.id,row.task.id) : onProject(row.project.id);setQuery('');}}><TypeIcon type={row.task?.type || row.project.type}/><span>{row.label}<small>{row.task ? row.project.name : '项目'}</small></span><Icon name="chevron"/></button>)}{!matches.length ? <p>没有匹配的项目、任务或修改意见</p> : null}<button onClick={()=>setQuery('')}>关闭搜索</button></div> : null}<div className="window-controls"><button title="最小化到任务栏" aria-label="最小化到任务栏" onClick={() => api?.minimize()}><WindowGlyph kind="minimize"/></button><button title={maximized?"还原":"最大化"} aria-label={maximized?"还原窗口":"最大化窗口"} onClick={() => api?.toggleMaximize()}><WindowGlyph kind={maximized?"restore":"maximize"}/></button><button className="close" title="关闭窗口" aria-label="关闭窗口" onClick={() => onClose?onClose():api?.close()}><WindowGlyph kind="close"/></button></div>
   </header>;

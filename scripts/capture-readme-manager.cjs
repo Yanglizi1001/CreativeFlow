@@ -1,0 +1,11 @@
+const {_electron}=require(process.env.CF_PLAYWRIGHT_PATH),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{root,absolute}=require('./project-paths.cjs');
+const temp=fs.mkdtempSync(path.join(os.tmpdir(),'creativeflow-manager-qa-')),entry=path.join(temp,'demo-window.cjs'),output=path.join(root,'docs/screenshots/0.7.1-beta');let app;
+let source=fs.readFileSync(path.join(__dirname,'host-manager-test-window.cjs'),'utf8');
+source=source.replace("const root=path.resolve(__dirname,'..')",'const root='+JSON.stringify(root)).replace("require('./project-paths.cjs')",'require('+JSON.stringify(path.join(__dirname,'project-paths.cjs'))+')').replaceAll('CF-SERVER','DEMO-SERVER').replace("workspaceName:'创作流团队协作',ownerName:'空间管理员'","workspaceName:'示例公司协作空间',ownerName:'林然'");
+source=source.replace('installDirectory:path.dirname(host),dataDirectory:data','installDirectory:String.raw`C:\\Program Files\\CreativeFlow Host`,dataDirectory:String.raw`D:\\CreativeFlow\\示例协作空间`');
+fs.writeFileSync(entry,source);
+(async()=>{
+ app=await _electron.launch({executablePath:path.join(root,'node_modules/electron/dist/electron.exe'),args:[entry],env:{...process.env,CF_MANAGER_TEST_DIR:temp,CF_MANAGER_ASAR:absolute('buildRoot','manager/win-unpacked/resources/app.asar')}});const page=await app.firstWindow();page.setDefaultTimeout(15000);await page.getByRole('heading',{name:'示例公司协作空间',exact:true}).waitFor();
+ await app.evaluate(()=>{global.__fixture.cli({action:'invite',name:'陈晓',role:'reviewer'});global.__fixture.cli({action:'invite',name:'周宁',role:'member'});});await page.getByRole('button',{name:'刷新状态',exact:true}).click();await page.getByText('3 人',{exact:true}).waitFor();await page.screenshot({path:path.join(output,'host-manager.jpg'),type:'jpeg',quality:84});
+ await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'存储用量',exact:true}).click();await page.getByRole('heading',{name:'空间用量',exact:true}).waitFor();await page.screenshot({path:path.join(output,'storage-protection.jpg'),type:'jpeg',quality:84});console.log('Manager examples captured using temporary data and a simulated Windows service adapter.');
+})().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{if(app)await app.close();});

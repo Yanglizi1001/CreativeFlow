@@ -1,4 +1,6 @@
 import { CreateActions } from './WorkflowControls';
+import {usePersistentDraft} from './collaboration/drafts';
+import {canEditOpinion} from './collaboration/permissions';
 import { taskColor } from './calendarLayout';
 import { projectColor, readableText } from './colors';
 import { Gantt } from './Schedule';
@@ -85,8 +87,17 @@ export function FeedbackCenter({ flow, onOpenTask }) {
   const [taskFilter, setTaskFilter] = useViewState('FeedbackCenter-taskFilter', 'all');
   const [statusFilter, setStatusFilter] = useViewState('FeedbackCenter-statusFilter', 'open');
   const [sortMode, setSortMode] = useViewState('FeedbackCenter-sortMode', 'project');
-  const [editing, setEditing] = useState(null);
-  const [editDraft,setEditDraft]=useState('');
+  const [editor,setEditor,draftError]=usePersistentDraft(`feedback:${flow.space?.id||'personal'}:editor`);
+  const [editError,setEditError]=useState('');
+  const editing=editor?.key||null,editDraft=editor?.text||'';
+  const setEditDraft=text=>setEditor(current=>({...current,text}));
+  const setEditing=value=>{if(value===null)setEditor(null);};
+  const startFeedbackEdit=(group,bundle,item,key)=>{if(!canEditOpinion(flow,bundle.version,item))return;setEditError('');setEditor({key,text:item.text,original:item.text,projectId:group.project.id,taskId:group.task.id,versionId:bundle.version.id,listId:bundle.list.id,itemId:item.id});};
+  const commitFeedback=async()=>{
+    const value=editor;if(!value)return;const text=value.text.trim();if(!text){setEditError('请输入修改意见，草稿已保留。');return;}
+    if(text!==value.original){const result=await flow.editItemAt(value.projectId,value.taskId,value.versionId,value.listId,value.itemId,{text},value.original);if(result===null||result===undefined){setEditError('意见已变化或保存失败，草稿已保留，请核对后重试。');return;}}
+    setEditor(current=>current?.key===value.key&&current.text===value.text?null:current);setEditError('');
+  };
   const rawGroups = useMemo(() => flow.db.projects.flatMap(project => project.tasks.map(task => ({ project, task, bundles: task.versions.flatMap(version => version.lists.map(list => ({ version, list }))) }))).filter(group => group.bundles.some(bundle => bundle.list.items.length)), [flow.db.projects]);
   const [openGroups, setOpenGroups] = useState(() => new Set(rawGroups.filter(group => group.bundles.some(bundle => bundle.list.items.some(item => !item.done))).map(group => group.task.id)));
   const taskOptions = useMemo(() => [{ value: 'all', label: '全部任务' }, ...flow.db.projects.filter(project => projectFilter === 'all' || project.id === projectFilter).flatMap(project => project.tasks.map(task => ({ value: task.id, label: task.name })))], [flow.db.projects, projectFilter]);
@@ -97,7 +108,7 @@ export function FeedbackCenter({ flow, onOpenTask }) {
   }, [rawGroups, projectFilter, taskFilter, sortMode]);
   const toggleGroup = taskId => setOpenGroups(current => { const next = new Set(current); if (next.has(taskId)) next.delete(taskId); else next.add(taskId); return next; });
   return <main className="page feedback-center"><div className="page-heading"><div><h1>修改意见</h1><p>跨项目处理修改意见，完成后直接划掉。</p></div></div>
-    <div className="feedback-filterbar"><AcrylicSelect value={projectFilter} label="筛选项目" onChange={value => { setProjectFilter(value); setTaskFilter('all'); }} options={[{ value: 'all', label: '全部项目' }, ...flow.db.projects.map(project => ({ value: project.id, label: project.name }))]} /><AcrylicSelect value={taskFilter} label="筛选任务" onChange={setTaskFilter} options={taskOptions} /><AcrylicSelect value={statusFilter} label="完成状态" onChange={setStatusFilter} options={[{ value: 'open', label: '仅看未完成' }, { value: 'all', label: '全部意见' }, { value: 'done', label: '仅看已完成' }]} /><AcrylicSelect value={sortMode} label="排序" onChange={setSortMode} options={[{ value: 'project', label: '按项目排列' }, { value: 'deadline', label: '按截止日期' }]} /></div>
+    {editError||draftError?<p className="space-error" role="alert">{editError||draftError}</p>:null}<div className="feedback-filterbar"><AcrylicSelect value={projectFilter} label="筛选项目" onChange={value => { setProjectFilter(value); setTaskFilter('all'); }} options={[{ value: 'all', label: '全部项目' }, ...flow.db.projects.map(project => ({ value: project.id, label: project.name }))]} /><AcrylicSelect value={taskFilter} label="筛选任务" onChange={setTaskFilter} options={taskOptions} /><AcrylicSelect value={statusFilter} label="完成状态" onChange={setStatusFilter} options={[{ value: 'open', label: '仅看未完成' }, { value: 'all', label: '全部意见' }, { value: 'done', label: '仅看已完成' }]} /><AcrylicSelect value={sortMode} label="排序" onChange={setSortMode} options={[{ value: 'project', label: '按项目排列' }, { value: 'deadline', label: '按截止日期' }]} /></div>
     <div className="feedback-task-groups">{groups.map(group => {
       const allItems = group.bundles.flatMap(bundle => bundle.list.items);
       const done = allItems.filter(item => item.done).length;
@@ -105,7 +116,7 @@ export function FeedbackCenter({ flow, onOpenTask }) {
       return <section key={group.task.id} className={open ? 'open' : ''}><div className="feedback-task-head"><button className="feedback-toggle" onClick={() => toggleGroup(group.task.id)}><Icon name={open ? 'down' : 'right'} /><span className="task-context"><TypeIcon type={group.task.type} /><span><strong>{group.task.name}</strong><small>{group.project.name} · 截止 {group.task.due || '未设置'}</small></span></span></button><StatusTag value={group.project.status} kind="project" compact /><StatusTag value={group.task.status} compact /><span className="feedback-progress">{done}/{allItems.length}</span><Button className="jump-button" onClick={() => onOpenTask(group.project.id, group.task.id)}>进入任务</Button></div>{open ? <div className="feedback-bundles">{group.bundles.map(bundle => {
         const visible = bundle.list.items.filter(item => statusFilter === 'all' || (statusFilter === 'open' ? !item.done : item.done));
         if (!visible.length) return null;
-        return <div className="feedback-bundle" key={bundle.list.id}><header><strong>{bundle.version.name} · {bundle.list.name}</strong><span>{bundle.list.items.filter(item => item.done).length}/{bundle.list.items.length}</span></header>{visible.map(item => { const editKey = `${bundle.list.id}-${item.id}`; return <div className={`feedback-item ${item.done ? 'done' : ''}`} key={item.id}><Check checked={item.done} onChange={() => flow.toggleItemAt(group.project.id, group.task.id, bundle.version.id, bundle.list.id, item.id)} label={item.text} /><time className={!item.time?'general-opinion':''}>{item.time || '整体'}</time>{editing === editKey ? <input autoFocus value={editDraft} onChange={event => setEditDraft(event.target.value)} onBlur={() => { const text=editDraft.trim();if(text&&text!==item.text)flow.editItemAt(group.project.id,group.task.id,bundle.version.id,bundle.list.id,item.id,{text});setEditing(null); }} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur();if(event.key==='Escape')setEditing(null); }} /> : <button onClick={() => {setEditDraft(item.text);setEditing(editKey);}}>{item.text}</button>}<span>{item.done ? '已完成' : '未完成'}</span></div>; })}</div>;
+        return <div className="feedback-bundle" key={bundle.list.id}><header><strong>{bundle.version.name} · {bundle.list.name}</strong><span>{bundle.list.items.filter(item => item.done).length}/{bundle.list.items.length}</span></header>{visible.map(item => { const editKey = `${bundle.list.id}-${item.id}`; return <div className={`feedback-item ${item.done ? 'done' : ''}`} key={item.id}><Check disabled={!canEditOpinion(flow,bundle.version,item)} checked={item.done} onChange={() => flow.toggleItemAt(group.project.id, group.task.id, bundle.version.id, bundle.list.id, item.id)} label={item.text} /><time className={!item.time?'general-opinion':''}>{item.time || '整体'}</time>{editing === editKey ? <input autoFocus value={editDraft} onChange={event => setEditDraft(event.target.value)} onBlur={commitFeedback} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur();if(event.key==='Escape')setEditing(null); }} /> : <button disabled={!canEditOpinion(flow,bundle.version,item)} onClick={() => startFeedbackEdit(group,bundle,item,editKey)}>{item.text}</button>}<span>{item.done ? '已完成' : '未完成'}</span></div>; })}</div>;
       })}</div> : null}</section>;
     })}{groups.length === 0 ? <div className="empty-state"><Icon name="check" size={34} /><h2>没有符合条件的修改意见</h2></div> : null}</div>
   </main>;

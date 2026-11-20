@@ -12,6 +12,7 @@ function loadDb() {
   catch {const db=migrateColors(cloneSeedData(),false);if(raw){localStorage.setItem(APP_STORAGE_KEY+'-recovery',raw);db.preferences.recoveryAvailable=true;}return db;}
 }
 function loadHistory() {try {const h=JSON.parse(localStorage.getItem(HISTORY_KEY));return h?.session===session&&Array.isArray(h.past)&&Array.isArray(h.future)?h:emptyHistory();}catch{return emptyHistory();}}
+export const personalDataExisted=Boolean(localStorage.getItem(APP_STORAGE_KEY));
 let snapshot={db:loadDb(),history:loadHistory(),saveStatus:'已保存',revision:0};
 try { if(!localStorage.getItem(APP_STORAGE_KEY))localStorage.setItem(APP_STORAGE_KEY,JSON.stringify(snapshot.db)); } catch {}
 try {const old=JSON.parse(localStorage.getItem(HISTORY_KEY));if(old&&old.session!==session)localStorage.removeItem(HISTORY_KEY);}catch{}
@@ -37,7 +38,7 @@ export const workStore={
   flush(){return locked(()=>latest().db);},
   change(updater,label='更新工作数据',options={}) {
     return locked(()=>{const {db,history}=latest();const next=typeof updater==='function'?updater(db):updater;if(JSON.stringify(next)===JSON.stringify(db))return;
-      const h=options.history===false?history:addHistory(history,db,next,label,crypto.randomUUID());save(next,h);return h.past.at(-1)?.id;
+      const operationId=crypto.randomUUID();const h=options.history===false?history:addHistory(history,db,next,label,operationId);save(next,h);return operationId;
     });
   },
   travel(direction,expectedId) {

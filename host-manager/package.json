@@ -1,0 +1,55 @@
+{
+  "name": "creativeflow-host-manager",
+  "version": "0.7.1-beta",
+  "description": "创作流协作主机安装、成员与局域网维护管理器",
+  "author": "CreativeFlow",
+  "private": true,
+  "main": "electron/main.cjs",
+  "packageManager": "traversal@1.0.0",
+  "build": {
+    "appId": "com.creativeflow.hostmanager",
+    "productName": "创作流协作管理器",
+    "electronVersion": "44.4.3",
+    "electronDist": "../node_modules/electron/dist",
+    "npmRebuild": false,
+    "asar": true,
+    "directories": {
+      "output": "../artifacts/builds/2026-11-20-version-management/manager"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "."
+      }
+    ],
+    "win": {
+      "icon": "../electron/assets/app.ico",
+      "requestedExecutionLevel": "requireAdministrator",
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "artifactName": "CreativeFlow-HostManager-${version}-win-x64.${ext}"
+    },
+    "portable": {
+      "artifactName": "CreativeFlow-HostManager-Portable-${version}-win-x64.${ext}",
+      "requestExecutionLevel": "admin"
+    },
+    "nsis": {
+      "include": "nsis/manager.nsh",
+      "artifactName": "CreativeFlow-HostManager-Setup-${version}-win-x64.${ext}",
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "创作流协作管理器",
+      "uninstallDisplayName": "创作流协作管理器"
+    }
+  }
+}

@@ -1,4 +1,6 @@
 import { DateFields } from './Schedule';
+import {can} from './collaboration/permissions';
+import {ReadonlyDetails} from './collaboration/ReadonlyDetails';
 import { ColorPicker } from './ColorPicker';
 import { defaultTaskColor } from './colors';
 import React from 'react';
@@ -8,6 +10,7 @@ export function TaskInspector({ flow, onClose, onProject, onBack }) {
   const { project, task } = flow.active;
   useEscape(onClose);
   const stages = [...new Set(['前期策划', '中期拍摄', '后期制作', '修改中', '内部审核', '客户审核', '已交付', ...(flow.db.preferences?.customOptions?.taskStages || [])])];
+  if(!can(flow,task,'manage'))return <ReadonlyDetails title="任务详情" entry={task} onClose={onClose} onBack={onBack}><Button onClick={onProject}>查看所属项目 · {project.name}</Button></ReadonlyDetails>;
   const update = (key, value, label) => {
  if(['start','due'].includes(key)) {
    const next={...task,[key]:value};

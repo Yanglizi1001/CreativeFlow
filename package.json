@@ -1,13 +1,13 @@
 {
   "name": "creative-flow-prototype",
-  "description": "面向创意工作者的个人项目、版本与修改意见管理应用",
+  "description": "本地项目管理与局域网视频协作审阅工作台",
   "author": "Creative Flow",
   "private": true,
   "repository": {
     "type": "git",
     "url": "https://github.com/Yanglizi1001/CreativeFlow.git"
   },
-  "version": "0.7.0-beta.3",
+  "version": "0.7.1-beta",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -17,8 +17,16 @@
     "test": "node --test tests/*.test.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "electron:dev": "electron .",
-    "package:win": "node ./node_modules/vite/bin/vite.js build && node ./scripts/prepare-desktop.cjs && node ./node_modules/electron-builder/out/cli/cli.js --projectDir ./package-desktop --win portable --x64",
-    "package:installer": "node ./node_modules/vite/bin/vite.js build && node ./scripts/prepare-desktop.cjs && node ./node_modules/electron-builder/out/cli/cli.js --projectDir ./package-desktop --win nsis --x64"
+    "package:win": "node ./node_modules/vite/bin/vite.js build && node ./scripts/prepare-desktop.cjs && node ./node_modules/electron-builder/out/cli/cli.js --projectDir ./packaging/client --win portable --x64",
+    "package:installer": "node ./node_modules/vite/bin/vite.js build && node ./scripts/prepare-desktop.cjs && node ./node_modules/electron-builder/out/cli/cli.js --projectDir ./packaging/client --win nsis --x64",
+    "check:layout": "node scripts/verify-project-layout.cjs",
+    "prepare:desktop": "node scripts/prepare-desktop.cjs",
+    "prepare:manager": "node scripts/prepare-host-manager.cjs",
+    "build:manager": "node node_modules/vite/bin/vite.js build --config host-manager/vite.config.mjs",
+    "package:all": "node scripts/build-windows.cjs",
+    "package:build-only": "node scripts/build-windows.cjs --build-only",
+    "versions:index": "node scripts/update-release-index.cjs",
+    "package:assemble": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/assemble-storage-release.ps1"
   },
   "dependencies": {},
   "devDependencies": {
@@ -37,8 +45,15 @@
     "electronDist": "node_modules/electron/dist",
     "npmRebuild": false,
     "asar": true,
+    "fileAssociations": [
+      {
+        "ext": "cfspace",
+        "name": "创作流公司接入文件",
+        "role": "Viewer"
+      }
+    ],
     "directories": {
-      "output": "release"
+      "output": "artifacts/builds/2026-11-20-storage/client"
     },
     "files": [
       "dist/**/*",

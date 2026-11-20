@@ -16,3 +16,4 @@ export function opinionPayload(kind,text,time,duration=0) {
   if(duration>0 && seconds>Math.ceil(duration))return {error:'时间码不能超过视频时长。'};
   return {value:{text:text.trim(),time:time.trim(),kind:'time'}};
 }
+export function toggleOpinion(row,desired) {const done=desired??!row.done;return {...row,done,status:done?'done':'todo'};}

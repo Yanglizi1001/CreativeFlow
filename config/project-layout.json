@@ -1,0 +1,18 @@
+{
+  "version": "0.7.1-beta",
+  "buildId": "2026-11-20-version-management",
+  "clientSource": "src",
+  "clientMain": "electron",
+  "managerSource": "host-manager",
+  "serviceSource": "collaboration-dev/server/CreativeFlow.Host",
+  "protocolSource": "collaboration-dev/packages/CreativeFlow.Protocol",
+  "desktopStaging": "packaging/client",
+  "buildRoot": "artifacts/builds/2026-11-20-version-management",
+  "publishedHost": "artifacts/published/0.7.1-beta/2026-11-20-version-management/host",
+  "qaRoot": "artifacts/qa/0.7.1-beta/2026-11-20-version-management",
+  "releaseRoot": "release/current",
+  "releaseName": "CreativeFlow-0.7.1-beta-20261120-版本管理完整包",
+  "releaseArchive": "release/current/CreativeFlow-0.7.1-beta-20261120-版本管理完整包.zip",
+  "historyRoot": "release/history",
+  "manualRoot": "docs/manuals"
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://creativeflow.local/schemas/v1/command-envelope.schema.json",
+  "title": "CreativeFlow command envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["operationId", "workspaceEpoch", "type", "entityId", "baseRevision", "payload"],
+  "properties": {
+    "operationId": { "type": "string", "minLength": 8, "maxLength": 128 },
+    "workspaceEpoch": { "type": "string", "minLength": 8, "maxLength": 64 },
+    "type": { "enum": ["CreateProject", "UpdateProject"] },
+    "entityId": { "type": "string", "minLength": 8, "maxLength": 128 },
+    "baseRevision": { "type": "integer", "minimum": 0 },
+    "payload": { "type": "object" },
+    "clientTime": { "type": ["string", "null"], "format": "date-time" }
+  }
+}

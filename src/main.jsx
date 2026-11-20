@@ -10,5 +10,6 @@ import './design-system.css';
 import './workflow.css';
 import './review-refinements.css';
 import './widget-refinements.css';
+import './collaboration/integration.css';
 
 createRoot(document.getElementById('root')).render(<App />);

@@ -1,4 +1,7 @@
 import { Thumbnail } from './Thumbnail';
+import {usePersistentDraft} from './collaboration/drafts';
+import {can,canEditOpinion} from './collaboration/permissions';
+import {ReadonlyDetails} from './collaboration/ReadonlyDetails';
 import { mediaSource } from './demoMedia';
 import { DateFields } from './Schedule';
 import { ColorPicker } from './ColorPicker';
@@ -51,7 +54,7 @@ export function ProjectDetail({ flow, onOverview, onTask, onNewTask }) {
   return <main className="project-detail-page">
     <section className="project-detail-main">
       
-      <div className="project-detail-header"><div><h1>{project.name}</h1><p>{project.description || '暂无项目说明'}</p></div><div className="header-actions"><Button className="danger-action" icon="trash" disabled={!project} title="删除当前项目" onClick={() => setDeleteProjectOpen(true)}>删除项目</Button><Button variant="primary" icon="plus" onClick={onNewTask}>新增任务</Button><Button icon="list" onClick={() => setDetailsOpen(true)}>项目详情</Button></div></div>
+      <div className="project-detail-header"><div><h1>{project.name}</h1><p>{project.description || '暂无项目说明'}</p></div><div className="header-actions"><Button className="danger-action" icon="trash" disabled={!project||!can(flow,project,'manage')} title="删除当前项目" onClick={() => setDeleteProjectOpen(true)}>删除项目</Button><Button variant="primary" icon="plus" onClick={onNewTask}>新增任务</Button><Button icon="list" onClick={() => setDetailsOpen(true)}>项目详情</Button></div></div>
       <div className="project-metadata"><div><small>项目状态</small><StatusTag value={project.status} kind="project" /></div><div><small>项目类型</small><span><StatusTag value={project.type} kind="type" compact /></span></div><div><small>项目周期</small><strong>{project.start || '未设开始'} → {project.due || '未设置'}</strong></div></div>
       <div className="detail-tabs"><button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}>项目概览</button><button className={tab === 'tasks' ? 'active' : ''} onClick={() => setTab('tasks')}>任务列表</button></div>
       {tab === 'overview' ? <section className="project-summary"><h2>项目说明</h2><p>{project.notes || '尚未填写项目备注。'}</p><h2>交付概况</h2><div className="summary-numbers"><span><strong>{project.tasks.length}</strong>个任务</span><span><strong>{project.tasks.filter(task => task.status === '已交付').length}</strong>已交付</span><span><strong>{countItems(project).total - countItems(project).done}</strong>条意见待处理</span></div></section> : <TaskTable project={project} flow={flow} onTask={onTask} />}
@@ -65,7 +68,7 @@ function ActivityFeed({ activities = [] }) {
 
 function ProjectDeleteZone({ project, flow, onDeleted }) {
   const [open, setOpen] = useState(false);
-  const canDelete = Boolean(project);
+  const canDelete = Boolean(project)&&can(flow,project,'manage');
   return <><div className="project-delete-zone"><div><strong>删除项目</strong><small>删除所有任务、版本和修改意见；不会删除电脑中的原文件。</small></div><Button className="danger-action" icon="trash" disabled={!canDelete} title={canDelete ? '删除当前项目' : '没有可删除的项目'} onClick={() => setOpen(true)}>删除项目</Button></div>{open ? <Modal title={`删除项目「${project.name}」`} onClose={() => setOpen(false)} footer={<><Button onClick={() => setOpen(false)}>取消</Button><Button className="danger-confirm" icon="trash" onClick={() => { if (flow.deleteProject(project.id)) { setOpen(false); onDeleted?.(); } }}>确认删除项目</Button></>}><div className="delete-version-copy"><span className="delete-version-icon"><Icon name="trash" size={22} /></span><div><strong>项目及其全部内容都会被删除</strong><p>包含 {project.tasks.length} 个任务、全部版本和修改意见记录。电脑中的原始文件不会被删除。</p></div></div><p className="form-hint">本次运行中可使用 Ctrl+Z 撤销，原始文件不受影响。</p></Modal> : null}</>;
 }
 
@@ -76,6 +79,7 @@ export function ProjectContextDrawer({ project, flow, onClose, onDeleted, onInsp
   useEscape(onClose,!inspectedTaskId);
   const custom=flow.db.preferences?.customOptions || {};
   if(inspectedTaskId && project.tasks.some(task=>task.id===inspectedTaskId))return <TaskInspector key={inspectedTaskId} flow={flow} onClose={onClose} onProject={()=>setInspectedTaskId(null)} onBack={()=>setInspectedTaskId(null)}/>;
+  if(!can(flow,project,'manage'))return <ReadonlyDetails title="项目详情" entry={project} onClose={onClose} onBack={onBack}>{project.tasks.map(task=><Button key={task.id} onClick={()=>inspectTask(task)}>查看任务 · {task.name}</Button>)}<ActivityFeed activities={project.activities}/></ReadonlyDetails>;
   return <><button className="drawer-scrim" aria-label="关闭项目详情" onClick={onClose}/><aside className="context-drawer project-context-drawer"><header><h2>项目详情</h2><div className="detail-header-actions">{onBack?<button aria-label="返回上一详情" title="返回上一详情" onClick={onBack}><Icon name="left"/></button>:null}<button onClick={onClose} aria-label="关闭"><Icon name="close"/></button></div></header><div className="detail-form">
   <label>项目名称<input key={project.id+'name'+project.name} defaultValue={project.name} onBlur={e=>{const name=e.target.value.trim();if(name && name!==project.name)update('name',name,'名称');else e.target.value=project.name;}}/></label>
   <label>项目标识颜色<ColorPicker label="项目标识颜色" value={project.color} defaultColor={project.defaultColor||'#3878cf'} preview={project.name} onChange={color=>update('color',color||project.defaultColor||'#3878cf','标识颜色')}/><small className="color-help">用于项目目录标识和甘特汇总条，不影响任务颜色。</small></label><label>项目说明<textarea key={project.id+'description'+project.description} defaultValue={project.description} onBlur={e=>{if(e.target.value!==project.description)update('description',e.target.value,'说明');}}/></label>
@@ -108,7 +112,7 @@ function TaskTable({ project, flow, onTask }) {
 function VersionTabs({ flow, onAdd, onDelete }) {
   const canDelete = Boolean(flow.active.version);
   if (!canDelete) return <section className="empty-state"><h2>这个任务还没有版本</h2><p>建立版本后即可关联文件、整理意见和审阅视频。</p><Button variant="primary" icon="plus" onClick={onAdd}>新增版本</Button></section>;
-  return <div className="version-bar unified-version-bar"><span>版本</span><AcrylicSelect value={flow.active.version.id} options={flow.active.task.versions.map(version => ({ value: version.id, label: version.name }))} onChange={flow.chooseVersion} label="选择任务版本" /><AcrylicSelect value={flow.active.version.status} options={['进行中', '已完成']} label="版本状态" onChange={status => flow.updateVersion(version => ({ ...version, status }), '修改了版本状态')} renderValue={value => <StatusTag value={value} kind="version" />} /><div className="version-actions"><Button icon="plus" onClick={onAdd}>新增版本</Button><Button className="danger-action" icon="trash" disabled={!canDelete} onClick={onDelete}>删除版本</Button></div></div>;
+  return <div className="version-bar unified-version-bar"><span>版本</span><AcrylicSelect value={flow.active.version.id} options={flow.active.task.versions.map(version => ({ value: version.id, label: version.name }))} onChange={flow.chooseVersion} label="选择任务版本" /><AcrylicSelect disabled={!can(flow,flow.active.version,'edit')} value={flow.active.version.status} options={['进行中', '已完成']} label="版本状态" onChange={status => flow.updateVersion(version => ({ ...version, status }), '修改了版本状态')} renderValue={value => <StatusTag value={value} kind="version" />} /><div className="version-actions"><Button icon="plus" disabled={!can(flow,flow.active.task,'manage')} onClick={onAdd}>新增版本</Button><Button className="danger-action" icon="trash" disabled={!canDelete||!can(flow,flow.active.version,'manage')} onClick={onDelete}>删除版本</Button></div></div>;
 }
 
 function FileRow({ flow, toast, onReview }) {
@@ -120,16 +124,18 @@ function FileRow({ flow, toast, onReview }) {
     if (chosen) receive({ name: chosen.name, size: `${(chosen.size / 1048576).toFixed(1)} MB`, path: chosen.path || '' });
     else receive(await window.creativeFlowWindow?.selectFile?.());
   };
+  if(flow.space)return <div className="file-row"><Thumbnail file={file} type={flow.active.task.type} className="file-thumb"/><span className="file-copy"><strong>{file?.name||'此版本尚未发布视频'}</strong><small>{flow.active.task.type==='视频'?'协作视频由主机保存，按版本权限播放和批注。':'此类任务可共享排期和意见；非视频交付文件继续使用本地关联。'}</small></span>{flow.active.task.type==='视频'?<Button variant="primary" onClick={onReview}>{file?'打开协作审阅':'进入审阅并发布视频'}</Button>:null}</div>;
   return <div className="file-row">{file ? <><Thumbnail file={file} type={flow.active.task.type} className="file-thumb"/><span className="file-copy"><strong>{file.name}</strong><small>{file.size || '大小未知'} · {flow.active.version.createdAt}</small></span>{flow.active.task.type === '视频' ? <Button variant="primary" icon="play" onClick={onReview}>审阅</Button> : null}<Button onClick={() => mediaSource(file) ? window.creativeFlowWindow?.openPath?.(mediaSource(file)) : toast('当前仅保存了文件名')}>系统打开</Button><Button icon="copy" onClick={() => { navigator.clipboard?.writeText(file.path || file.name); toast('已复制文件信息'); }}>复制路径</Button><Button className="danger-action" icon="trash" onClick={() => { if (flow.clearFile()) toast('已取消关联，原文件未删除'); }}>取消关联</Button></> : <button className="empty-file" onClick={() => window.creativeFlowWindow?.selectFile ? selectFile() : input.current.click()}><Icon name="upload" /><span><strong>关联当前版本文件</strong><small>视频、图片、PPT 或其他交付文件</small></span></button>}<input ref={input} hidden type="file" onChange={selectFile} /></div>;
 }
 
 function Checklist({ flow, toast }) {
   const [filter, setFilter] = useState(false);
   const [sort, setSort] = useState('default');
-  const [draft, setDraft] = useState('');
-  const [editing, setEditing] = useState(null);
+  const [draftRecord,setDraftRecord]=usePersistentDraft(`quick:${flow.space?.id||'personal'}:${flow.active.version?.id}:${flow.active.list?.id}`);
+  const draft=draftRecord?.text||'',setDraft=text=>setDraftRecord(text?{text}:null);
+  const [editDraft,setEditDraft,draftError]=usePersistentDraft(`task:${flow.space?.id||'personal'}:${flow.active.version?.id}:editor`);
+  const editing=editDraft?.rowId||null,setEditing=value=>{if(value===null)setEditDraft(null);};
   const [deleteListOpen, setDeleteListOpen] = useState(false);
-  const [editDraft, setEditDraft] = useState({ time: '', text: '' });
   const importRef = useRef();
   const editRowRef = useRef(null);
   const lists = flow.active.version?.lists || [];
@@ -140,29 +146,30 @@ function Checklist({ flow, toast }) {
     if (sort === 'status') source.sort((a, b) => Number(a.done) - Number(b.done));
     return source;
   }, [list, filter, sort]);
-  const add = event => {
+  const add = async event => {
     event.preventDefault();
     const value = draft.trim();
     if (!value) return;
     const match = value.match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s*[-—:：]?\s*(.+)$/);
-    flow.addItem(match ? match[2] : value, match ? match[1] : '');
-    setDraft('');
+    const result=await flow.addItem(match ? match[2] : value, match ? match[1] : '');
+    if(result!==null&&result!==undefined)setDraftRecord(current=>current?.text?.trim()===value?null:current);
   };
   const importing = async event => {
     const file = event.target.files?.[0];
     if (!file) return;
     const text = await file.text();
     const imported = parseFeedbackText(text);
-    flow.importItems(imported);
-    toast(`已导入 ${imported.length} 条修改意见`);
+    const result=await flow.importItems(imported);
+    const failed=result===null||result===undefined&&imported.length>0;toast(failed?'导入未保存，请查看同步状态':`已导入 ${imported.length} 条修改意见`,failed?'error':'ok');
     event.target.value = '';
   };
-  const startEdit = row => { setEditing(row.id); setEditDraft({ time: row.time || '', text: row.text }); };
-  const commitEdit = () => {
-    if (!editing) return;
-    flow.editItem(editing, { time: editDraft.time.trim(), text: editDraft.text.trim() || '未命名修改意见' });
-
-    setEditing(null);
+  const startEdit = row => {if(!canEditOpinion(flow,flow.active.version,row))return;setEditDraft({rowId:row.id,time:row.time||'',originalTime:row.time||'',text:row.text,original:row.text,projectId:flow.active.project.id,taskId:flow.active.task.id,versionId:flow.active.version.id,listId:flow.active.list.id});};
+  const commitEdit = async() => {
+    const value=editDraft;if(!value?.rowId)return;
+    if(value.text===value.original&&value.time===(value.originalTime??'')){setEditing(null);return;}
+    const result=await flow.editItemAt(value.projectId,value.taskId,value.versionId,value.listId,value.rowId,{time:value.time.trim(),text:value.text.trim()||'未命名修改意见'},{text:value.original,time:value.originalTime});
+    if(result===null||result===undefined){toast('意见已变化或保存失败，草稿已保留。','error');return;}
+    setEditDraft(current=>current?.rowId===value.rowId&&current.text===value.text?null:current);
   };
   useEffect(() => {
     if (!editing) return undefined;
@@ -172,32 +179,29 @@ function Checklist({ flow, toast }) {
   }, [editing, editDraft]);
   if (!lists.length) return <section className="empty-state"><Icon name="comment" size={34} /><h2>为这个版本建立第一份修改清单</h2><p>可以按自检、内部反馈或客户轮次自由创建。</p><Button variant="primary" icon="plus" onClick={() => document.dispatchEvent(new Event('new-list'))}>新建修改清单</Button></section>;
   return <><div className="list-tabs">{lists.map(entry => { const progress = countItems(entry); return <button key={entry.id} className={list?.id === entry.id ? 'active' : ''} onClick={() => flow.chooseList(entry.id)}><span>{entry.name}</span><em>{progress.done}/{progress.total}</em></button>; })}<button className="add-list" onClick={() => document.dispatchEvent(new Event('new-list'))}><Icon name="plus" />新增列表</button></div>
-    <div className="check-toolbar"><div><Button icon="download" onClick={() => importRef.current.click()}>导入意见</Button><Button className="danger-action" icon="trash" onClick={() => setDeleteListOpen(true)}>删除当前列表</Button><input ref={importRef} type="file" accept=".txt,.md,.srt" hidden onChange={importing} /><label className="filter"><Check checked={filter} onChange={event => setFilter(event.target.checked)} label="仅看未完成" />仅看未完成</label></div><AcrylicSelect value={sort} label="排序" onChange={setSort} options={[{ value: 'default', label: '默认顺序' }, { value: 'time', label: '按时间码' }, { value: 'status', label: '未完成优先' }]} /></div>
-    <div className="check-table"><div className="table-head"><span /><span>#</span><span>时间点</span><span>修改意见</span><span>状态</span><span>操作</span></div>{rows.map((row, index) => <div ref={editing === row.id ? editRowRef : null} className={`check-row ${row.done ? 'done' : ''}`} key={row.id}><Check checked={row.done} onChange={() => flow.toggleItem(row.id)} label={row.text} /><span>{index + 1}</span>{editing === row.id ? <><input className="time-input" value={editDraft.time} onChange={event => setEditDraft(current => ({ ...current, time: event.target.value }))} /><input className="text-input" autoFocus value={editDraft.text} onChange={event => setEditDraft(current => ({ ...current, text: event.target.value }))} onKeyDown={event => { if (event.key === 'Enter') commitEdit(); if (event.key === 'Escape') setEditing(null); }} /></> : <><button className={"timecode "+(!row.time?'general-opinion':'')} onClick={() => startEdit(row)}>{row.time || '整体'}</button><button className="item-text" onClick={() => startEdit(row)}>{row.text}</button></>}<span className={`status ${row.done ? 'done' : ''}`}>{row.done ? '已完成' : '未完成'}</span><span className="row-actions"><button onClick={() => editing === row.id ? commitEdit() : startEdit(row)}><Icon name="edit" /></button><button onClick={() => flow.removeItem(row.id)}><Icon name="trash" /></button></span></div>)}</div>
-    <form className="quick-add" onSubmit={add}><Icon name="plus" /><input value={draft} onChange={event => setDraft(event.target.value)} placeholder="输入修改意见；可用“00:32 音乐提前进入”自动识别时间码" /><button>添加</button></form>{deleteListOpen ? <Modal title={`删除修改清单「${list?.name || ''}」`} onClose={() => setDeleteListOpen(false)} footer={<><Button onClick={() => setDeleteListOpen(false)}>取消</Button><Button className="danger-confirm" icon="trash" onClick={() => { flow.deleteList(); setDeleteListOpen(false); toast('修改清单已删除'); }}>确认删除</Button></>}><p className="dialog-copy">将删除此列表及其中 {list?.items.length || 0} 条修改意见，其他列表和版本不会受影响。</p><p className="form-hint">本次运行中可使用 Ctrl+Z 撤销，原始文件不受影响。</p></Modal> : null}</>;
+    <div className="check-toolbar"><div><Button disabled={!can(flow,flow.active.version,'comment')} icon="download" onClick={() => importRef.current.click()}>导入意见</Button><Button disabled={!can(flow,flow.active.version,'edit')} className="danger-action" icon="trash" onClick={() => setDeleteListOpen(true)}>删除当前列表</Button><input ref={importRef} type="file" accept=".txt,.md,.srt" hidden onChange={importing} /><label className="filter"><Check checked={filter} onChange={event => setFilter(event.target.checked)} label="仅看未完成" />仅看未完成</label></div><AcrylicSelect value={sort} label="排序" onChange={setSort} options={[{ value: 'default', label: '默认顺序' }, { value: 'time', label: '按时间码' }, { value: 'status', label: '未完成优先' }]} /></div>
+    <div className="check-table"><div className="table-head"><span /><span>#</span><span>时间点</span><span>修改意见</span><span>状态</span><span>操作</span></div>{rows.map((row, index) => <div ref={editing === row.id ? editRowRef : null} className={`check-row ${row.done ? 'done' : ''}`} key={row.id}><Check disabled={!canEditOpinion(flow,flow.active.version,row)} checked={row.done} onChange={() => flow.toggleItem(row.id)} label={row.text} /><span>{index + 1}</span>{editing === row.id ? <><input className="time-input" value={editDraft.time} onChange={event => setEditDraft(current => ({ ...current, time: event.target.value }))} /><input className="text-input" autoFocus value={editDraft.text} onChange={event => setEditDraft(current => ({ ...current, text: event.target.value }))} onKeyDown={event => { if (event.key === 'Enter') commitEdit(); if (event.key === 'Escape') setEditing(null); }} /></> : <><button className={"timecode "+(!row.time?'general-opinion':'')} onClick={() => startEdit(row)}>{row.time || '整体'}</button><button className="item-text" onClick={() => startEdit(row)}>{row.text}</button></>}<span className={`status ${row.done ? 'done' : ''}`}>{row.done ? '已完成' : '未完成'}</span><span className="row-actions"><button onClick={() => editing === row.id ? commitEdit() : startEdit(row)}><Icon name="edit" /></button><button onClick={() => flow.removeItem(row.id)}><Icon name="trash" /></button></span></div>)}</div>
+    <form className="quick-add" onSubmit={add}><Icon name="plus" /><input value={draft} onChange={event => setDraft(event.target.value)} disabled={!can(flow,flow.active.version,'comment')} placeholder="输入修改意见；可用“00:32 音乐提前进入”自动识别时间码" /><button disabled={!can(flow,flow.active.version,'comment')}>添加</button></form>{deleteListOpen ? <Modal title={`删除修改清单「${list?.name || ''}」`} onClose={() => setDeleteListOpen(false)} footer={<><Button onClick={() => setDeleteListOpen(false)}>取消</Button><Button className="danger-confirm" icon="trash" onClick={() => { flow.deleteList(); setDeleteListOpen(false); toast('修改清单已删除'); }}>确认删除</Button></>}><p className="dialog-copy">将删除此列表及其中 {list?.items.length || 0} 条修改意见，其他列表和版本不会受影响。</p><p className="form-hint">本次运行中可使用 Ctrl+Z 撤销，原始文件不受影响。</p></Modal> : null}</>;
 }
 
-export function TaskWorkspace({ flow, rightPanel, setRightPanel, openVersion, toast, onOverview, onProjectDetail, onReview }) {
+export function TaskWorkspace({onDeleteVersion, flow, rightPanel, setRightPanel, openVersion, toast, onOverview, onProjectDetail, onReview }) {
   const project = flow.active.project;
   const task = flow.active.task;
   const [newList, setNewList] = useState(false);
-  const [deleteVersionOpen, setDeleteVersionOpen] = useState(false);
   const [deleteTaskOpen, setDeleteTaskOpen] = useState(false);
   const [name, setName] = useState('');
   const stageOptions = taggedOptions(baseStages, flow.db.preferences?.customOptions?.taskStages, 'stage');
   useEffect(() => { const open = () => setNewList(true); document.addEventListener('new-list', open); return () => document.removeEventListener('new-list', open); }, []);
   if (!project || !task) return null;
-  const versionProgress = countItems(flow.active.version);
   return <>
     <main className="workarea">
       
-      <div className="task-header"><div><h1>{task?.name || project.name}</h1><p>{project.description || '暂无项目说明'}</p></div><div className="task-header-actions"><AcrylicSelect className="stage-picker" value={task.status} options={stageOptions} label="项目阶段" creatable createLabel="输入新任务阶段…" onCreate={value => { flow.addCustomOption('taskStages', value); flow.updateTask(current => ({ ...current, status: value }), `将任务阶段改为「${value}」`); }} onChange={value => flow.updateTask(current => ({ ...current, status: value }), `将任务阶段改为「${value}」`)} renderValue={value => <StatusTag value={value} />} /><Button className="danger-action" icon="trash" onClick={() => setDeleteTaskOpen(true)}>删除任务</Button><Button icon="list" onClick={() => setRightPanel(true)}>任务详情</Button></div></div>
-      <VersionTabs flow={flow} onAdd={openVersion} onDelete={() => setDeleteVersionOpen(true)} />
+      <div className="task-header"><div><h1>{task?.name || project.name}</h1><p>{project.description || '暂无项目说明'}</p></div><div className="task-header-actions"><AcrylicSelect disabled={!can(flow,task,'manage')} className="stage-picker" value={task.status} options={stageOptions} label="项目阶段" creatable createLabel="输入新任务阶段…" onCreate={value => { flow.addCustomOption('taskStages', value); flow.updateTask(current => ({ ...current, status: value }), `将任务阶段改为「${value}」`); }} onChange={value => flow.updateTask(current => ({ ...current, status: value }), `将任务阶段改为「${value}」`)} renderValue={value => <StatusTag value={value} />} /><Button disabled={!can(flow,task,'manage')} className="danger-action" icon="trash" onClick={() => setDeleteTaskOpen(true)}>删除任务</Button><Button icon="list" onClick={() => setRightPanel(true)}>任务详情</Button></div></div>
+      <VersionTabs flow={flow} onAdd={openVersion} onDelete={onDeleteVersion} />
       {flow.active.version ? <><FileRow flow={flow} toast={toast} onReview={onReview} /><Checklist key={flow.active.version.id} flow={flow} toast={toast} /></> : null}
     </main>
     {rightPanel ? <TaskInspector key={task.id} flow={flow} onClose={() => setRightPanel(false)} onProject={() => { setRightPanel(false); onProjectDetail(); }} /> : null}
     {newList ? <Modal title="新建修改清单" onClose={() => setNewList(false)} footer={<><Button onClick={() => setNewList(false)}>取消</Button><Button variant="primary" onClick={() => { if (!name.trim()) return; flow.addList(name.trim()); setNewList(false); setName(''); }}>创建</Button></>}><label className="stack">名称<input autoFocus value={name} onChange={event => setName(event.target.value)} placeholder="例如：客户第二轮反馈" /></label><p className="form-hint">按需建立任意修改类型，所有意见在同一页平铺显示。</p></Modal> : null}
-    {deleteVersionOpen ? <Modal title={`删除版本 ${flow.active.version.name}`} onClose={() => setDeleteVersionOpen(false)} footer={<><Button onClick={() => setDeleteVersionOpen(false)}>取消</Button><Button className="danger-confirm" icon="trash" onClick={() => { const deleted = flow.deleteVersion(); setDeleteVersionOpen(false); if (deleted) toast('版本已删除'); }}>确认删除</Button></>}><div className="delete-version-copy"><span className="delete-version-icon"><Icon name="trash" size={22} /></span><div><strong>确定删除当前版本吗？</strong><p>将删除 {versionProgress.total} 条修改意见、{flow.active.version.lists.length} 个意见列表{flow.active.version.file ? '及关联文件记录' : ''}。电脑中的原始文件不会被删除。</p></div></div><p className="form-hint">本次运行中可使用 Ctrl+Z 撤销。删除后自动切换到最新的剩余版本。</p></Modal> : null}
     {deleteTaskOpen ? <Modal title={`删除任务「${task.name}」`} onClose={() => setDeleteTaskOpen(false)} footer={<><Button onClick={() => setDeleteTaskOpen(false)}>取消</Button><Button className="danger-confirm" icon="trash" onClick={() => { if (flow.deleteTask(project.id, task.id)) { setDeleteTaskOpen(false); onProjectDetail(); } }}>确认删除任务</Button></>}><div className="delete-version-copy"><span className="delete-version-icon"><Icon name="trash" size={22} /></span><div><strong>任务及其全部版本都会被删除</strong><p>将同时删除 {task.versions.length} 个版本和 {countItems(task).total} 条修改意见。电脑中的原始文件不会被删除。</p></div></div><p className="form-hint">本次运行中可使用 Ctrl+Z 撤销，原始文件不受影响。</p></Modal> : null}
   </>;
 }

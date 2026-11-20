@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 const states = new Map(), scrolls = new Map();
+let namespace='personal';
+export function setViewNamespace(value){namespace=value||'personal';}
 export function useViewState(key, initial) {
+  key=namespace+':'+key;
   const [value, setValue] = useState(() => states.has(key) ? states.get(key) : typeof initial === 'function' ? initial() : initial);
   const set = next => setValue(previous => { const value = typeof next === 'function' ? next(previous) : next; states.set(key, value); return value; });
   return [value, set];
 }
 export function useScrollMemory(key) {
+  key=namespace+':'+key;
   useEffect(() => {
     const surface = document.querySelector('.main-surface');
     if (!surface) return;

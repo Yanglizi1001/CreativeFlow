@@ -1,5 +1,5 @@
 // Work-data patches preserve unrelated fields such as playback position and activity logs.
-const volatile = new Set(['activities', 'reviewPosition', 'reviewedAt', 'duration']);
+const volatile = new Set(['versionSequence','activities', 'reviewPosition', 'reviewedAt', 'duration']);
 const copy = value => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 export function diffWork(before, after, path = []) {

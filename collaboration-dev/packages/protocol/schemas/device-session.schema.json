@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://creativeflow.local/schemas/v1/device-session.schema.json",
+  "title": "CreativeFlow device session",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["workspaceId", "workspaceEpoch", "memberId", "deviceId", "displayName", "role", "token"],
+  "properties": {
+    "workspaceId": { "type": "string" },
+    "workspaceEpoch": { "type": "string" },
+    "memberId": { "type": "string" },
+    "deviceId": { "type": "string" },
+    "displayName": { "type": "string" },
+    "role": { "enum": ["owner", "member", "reviewer"] },
+    "token": { "type": "string", "minLength": 32 }
+  }
+}

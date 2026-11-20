@@ -1,0 +1,71 @@
+name: Publish CreativeFlow 0.7.1 beta
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-071.yml'
+      - 'config/github-release-trigger.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: creativeflow-071-publish
+  cancel-in-progress: false
+
+jobs:
+  windows-release:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: '8.0.x'
+      - name: Install locked dependencies and Electron
+        run: |
+          npx --yes pnpm@10.15.1 install --frozen-lockfile --ignore-scripts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node node_modules/electron/install.js
+      - name: Test local data and synchronization
+        run: node --test tests/*.test.mjs
+      - name: Restore and test service
+        run: |
+          dotnet restore collaboration-dev/tests/CreativeFlow.Host.Tests/CreativeFlow.Host.Tests.csproj -r win-x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet test collaboration-dev/tests/CreativeFlow.Host.Tests/CreativeFlow.Host.Tests.csproj -c Release -r win-x64 --no-restore --logger 'trx;LogFileName=service-tests.trx' --results-directory artifacts/ci-tests
+      - name: Build self-contained host
+        run: |
+          $layout = Get-Content config/project-layout.json -Raw | ConvertFrom-Json
+          dotnet publish collaboration-dev/server/CreativeFlow.Host/CreativeFlow.Host.csproj -c Release -r win-x64 --self-contained true --no-restore -o $layout.publishedHost
+      - name: Build client and manager
+        run: |
+          node node_modules/vite/bin/vite.js build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node node_modules/vite/bin/vite.js build --config host-manager/vite.config.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/prepare-desktop.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/prepare-host-manager.cjs
+      - name: Package client installer and portable
+        run: node node_modules/electron-builder/out/cli/cli.js --projectDir ./packaging/client --win nsis portable --x64
+      - name: Package manager installer and portable
+        run: node node_modules/electron-builder/out/cli/cli.js --projectDir ./host-manager --win nsis portable --x64
+      - name: Assemble complete delivery and checksums
+        run: ./scripts/assemble-github-release.ps1
+      - name: Publish release after verification
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            await require('./scripts/publish-github-release.cjs')({github,context,core});

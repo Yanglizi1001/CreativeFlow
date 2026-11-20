@@ -1,3 +1,4 @@
+import {nextVersionNumber} from './versionLifecycle.mjs';
 import React, { useRef, useState } from 'react';
 import { AcrylicSelect, Button, Check, Modal, StatusTag } from './ui';
 import { dateKey } from './dates';
@@ -36,14 +37,14 @@ export function CreationDialog({request,flow,onClose,onCreated}) {
         {isProject?<label className="span-2">首个任务<input value={form.taskName} onChange={e=>set('taskName',e.target.value)} placeholder="例如：30 秒主宣传片"/></label>:null}
         <label className="span-2">类型<AcrylicSelect value={form.type} label="任务类型" options={options(['视频','图片','PPT'],'projectTypes')} creatable createLabel="输入新类型…" onCreate={value=>{flow.addCustomOption('projectTypes',value);set('type',value);}} onChange={value=>{set('type',value);if(value!=='视频')set('file',null);}}/></label>
         <label>开始日期<input type="date" value={form.start} max={form.due||undefined} onChange={e=>set('start',e.target.value)}/></label><label>截止日期<input type="date" value={form.due} min={form.start||undefined} onChange={e=>set('due',e.target.value)}/></label>
-        {isProject?<><label className="span-2">项目状态<AcrylicSelect label="项目状态" value={form.projectStatus} options={options(['计划中','进行中','已暂停','已完成'],'projectStatuses')} creatable createLabel="输入新项目状态…" onCreate={value=>{flow.addCustomOption('projectStatuses',value);set('projectStatus',value);}} onChange={value=>set('projectStatus',value)}/></label><label className="span-2">项目说明<textarea value={form.description} onChange={e=>set('description',e.target.value)}/></label></>:<><label className="span-2">当前阶段<AcrylicSelect label="当前阶段" value={form.status} options={options(['前期策划','中期拍摄','后期制作','修改中','内部审核','客户审核'],'taskStages')} creatable createLabel="输入新任务阶段…" onCreate={value=>{flow.addCustomOption('taskStages',value);set('status',value);}} onChange={value=>set('status',value)}/></label>{form.type==='视频'?<div className="span-2"><span className="field-label">首个版本的视频（可选）</span><FileChoice file={form.file} onChange={value=>set('file',value)}/></div>:null}</>}
+        {isProject?<><label className="span-2">项目状态<AcrylicSelect label="项目状态" value={form.projectStatus} options={options(['计划中','进行中','已暂停','已完成'],'projectStatuses')} creatable createLabel="输入新项目状态…" onCreate={value=>{flow.addCustomOption('projectStatuses',value);set('projectStatus',value);}} onChange={value=>set('projectStatus',value)}/></label><label className="span-2">项目说明<textarea value={form.description} onChange={e=>set('description',e.target.value)}/></label></>:<><label className="span-2">当前阶段<AcrylicSelect label="当前阶段" value={form.status} options={options(['前期策划','中期拍摄','后期制作','修改中','内部审核','客户审核'],'taskStages')} creatable createLabel="输入新任务阶段…" onCreate={value=>{flow.addCustomOption('taskStages',value);set('status',value);}} onChange={value=>set('status',value)}/></label>{form.type==='视频'?<div className="span-2"><span className="field-label">首个版本的视频（可选）</span>{flow.space?<p className="form-hint">创建后在审阅页发布协作视频。</p>:<FileChoice file={form.file} onChange={value=>set('file',value)}/>}</div>:null}</>}
       </>}{error?<p className="form-error span-2" role="alert">{error}</p>:null}
     </form>
   </Modal>;
 }
 export function VersionDialog({request,flow,onClose,onCreated}) {
   const project=flow.db.projects.find(p=>p.id===request.projectId),task=project?.tasks.find(t=>t.id===request.taskId);
-  const number=Math.max(0,...(task?.versions||[]).map(v=>Number.parseInt(v.name.replace(/\D/g,''),10)||0))+1;
+  const number=nextVersionNumber(task);
   const [name,setName]=useState('V'+number),[inherit,setInherit]=useState(false),[source,setSource]=useState(request.versionId||task?.versions.at(-1)?.id||''),[file,setFile]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const pending=useRef(false),close=()=>{if(!pending.current)onClose();};
   const submit=async event=>{event.preventDefault();if(pending.current)return;setError('');if(!task){setError('当前任务已不存在，请关闭后重新选择。');return;}if(task.versions.some(v=>v.name.trim().toLowerCase()===name.trim().toLowerCase())){setError('版本名称已存在，请使用其他名称。');return;}
@@ -52,7 +53,7 @@ export function VersionDialog({request,flow,onClose,onCreated}) {
   return <Modal title="新增版本" onClose={close} footer={<><Button disabled={busy} onClick={close}>取消</Button><Button disabled={busy||!task} variant="primary" type="submit" form="version-form">{busy?'正在创建…':'创建版本'}</Button></>}><form id="version-form" className="form-grid" onSubmit={submit}>
     <div className="span-2 creation-context"><small>所属任务</small><strong>{project?.name} / {task?.name || '任务已删除'}</strong></div>
     <label className="span-2">版本名称<input autoFocus required value={name} onChange={e=>setName(e.target.value)} maxLength={60}/></label>
-    <div className="span-2"><span className="field-label">新版本视频（可选）</span><FileChoice file={file} onChange={setFile}/></div>
+    <div className="span-2"><span className="field-label">新版本视频（可选）</span>{flow.space?<p className="form-hint">创建后，在审阅页点击“发布协作视频”，视频将保存到公司主机。</p>:<FileChoice file={file} onChange={setFile}/>}</div>
     <label className="span-2 inherit-choice"><Check checked={inherit} onChange={e=>setInherit(e.target.checked)} label="继承未完成意见"/>继承未完成意见</label>
     {inherit?<label className="span-2">继承来源<AcrylicSelect label="继承来源版本" value={source} options={(task?.versions||[]).map(v=>({value:v.id,label:v.name}))} onChange={setSource}/></label>:null}
     <p className="form-hint span-2">{inherit?'仅复制所选版本的未完成意见；新旧版本各自独立。':'默认建立空版本，不复制旧版本的文件和意见。'}创建后仍停留在当前界面。</p>

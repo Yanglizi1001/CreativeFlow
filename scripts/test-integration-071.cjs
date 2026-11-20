@@ -1,0 +1,80 @@
+const {_electron}=require(process.env.CF_PLAYWRIGHT_PATH);
+const path=require('path'),fs=require('fs'),os=require('os'),assert=require('assert/strict');
+const {spawn}=require('child_process');
+const root=path.resolve(__dirname,'..'),temporary=fs.mkdtempSync(path.join(os.tmpdir(),'creativeflow-071-'));
+const output=path.join(root,require('./project-paths.cjs').relative('qaRoot', 'integration/qa'));fs.mkdirSync(output,{recursive:true});
+const hostRoot=path.join(root,require('./project-paths.cjs').relative('publishedHost')),base='http://127.0.0.1:47857';
+const dotnet=path.join(root,'collaboration-dev/.dotnet/dotnet.exe');
+const host=spawn(dotnet,[path.join(hostRoot,'CreativeFlow.Host.dll'),'--Host:Urls='+base,'--Host:DataDirectory='+path.join(temporary,'host')],{cwd:hostRoot,windowsHide:true,stdio:'ignore',env:{...process.env,DOTNET_ROOT:path.dirname(dotnet)}});
+let desktop,testPage;
+async function api(route,body,token) {
+  const response=await fetch(base+route,{method:body?'POST':'GET',headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{})});
+  if(!response.ok)throw Error(`${route}: ${response.status} ${await response.text()}`);return response.json();
+}
+async function menu(page,label){await page.getByRole('button',{name:'应用菜单',exact:true}).click();await page.getByRole('menuitem',{name:label,exact:true}).click();}
+async function main(){
+  for(let n=0;n<60;n++){try{await api('/api/v1/health');break;}catch{await new Promise(r=>setTimeout(r,200));}}
+  const setup=await api('/api/v1/setup',{workspaceName:'集成验收空间',ownerDisplayName:'测试负责人'});
+  desktop=await _electron.launch({executablePath:path.join(root,'node_modules/electron/dist/electron.exe'),args:[path.join(__dirname,'integration-071-window.cjs')],env:{...process.env,CF_UI_TEST_PROFILE:path.join(temporary,'creativeflow-071-profile')}});
+  const page=await desktop.firstWindow();testPage=page;page.setDefaultTimeout(12000);const errors=[];
+  page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+  await page.getByRole('button',{name:'我的项目',exact:true}).waitFor();
+  assert.match(page.url(),/dist\/index.html/);assert.ok(await page.locator('.app').isVisible());
+  await page.screenshot({path:path.join(output,'01-local.png')});
+  await menu(page,'新建项目');
+  await page.getByRole('textbox',{name:'项目名称',exact:true}).fill('集成测试本地项目');
+  await page.getByRole('button',{name:'创建',exact:true}).click();
+  await page.getByRole('heading',{name:'集成测试本地项目',exact:true}).waitFor();
+  await page.keyboard.press('Control+z');await page.locator('.project-row').filter({hasText:'集成测试本地项目'}).waitFor({state:'hidden'});
+  await page.keyboard.press('Control+Shift+z');await page.locator('.project-row').filter({hasText:'集成测试本地项目'}).click();
+  const localBefore=await page.evaluate(()=>localStorage.getItem('creative-flow-db-v2'));
+  await page.getByRole('button',{name:'我的项目',exact:true}).click();
+  await page.getByRole('textbox',{name:'协作主机地址',exact:true}).fill(base);
+  await page.getByRole('textbox',{name:'邀请码',exact:true}).fill(setup.invitationCode);
+  await page.getByRole('textbox',{name:'我的姓名',exact:true}).fill('测试负责人');
+  await page.getByRole('button',{name:'验证并加入',exact:true}).click();
+  const connectionButton=page.getByRole('button',{name:'集成验收空间 · 测试负责人',exact:true});await connectionButton.waitFor();
+  await page.getByRole('button',{name:'关闭',exact:true}).last().click();
+  await menu(page,'上传本地项目资料');
+  const uploadDialog=page.getByRole('dialog',{name:'上传项目资料至协作空间',exact:true});await uploadDialog.waitFor();
+  await uploadDialog.locator('select').nth(0).selectOption({label:'集成测试本地项目'});
+  const select=uploadDialog.locator('select').nth(1);await select.selectOption({label:'集成验收空间 · 测试负责人'});
+  await page.getByRole('button',{name:'确认上传资料',exact:true}).click();
+  await page.getByRole('status').filter({hasText:'上传成功'}).waitFor();
+  await page.getByRole('button',{name:'完成',exact:true}).click();
+  assert.equal(await page.evaluate(()=>localStorage.getItem('creative-flow-db-v2')),localBefore,'upload must not mutate the local original');
+  await page.getByRole('button',{name:'我的项目',exact:true}).click();await page.getByRole('button',{name:'集成验收空间 · 测试负责人',exact:true}).click();
+  await page.getByRole('button',{name:'集成验收空间',exact:true}).waitFor();
+  assert.ok((await page.locator('.workspace-content').innerText()).includes('集成测试本地项目'));
+  assert.ok(!(await page.locator('.workspace-content').innerText()).includes('新品发布创意全案'),'private demo project was not uploaded');
+  await menu(page,'新建项目');await page.getByRole('textbox',{name:'项目名称',exact:true}).fill('公司新建项目');await page.getByRole('button',{name:'创建',exact:true}).click();
+  await page.getByRole('heading',{name:'公司新建项目',exact:true}).waitFor();
+  await page.screenshot({path:path.join(output,'02-company-project.png')});
+  const vault=JSON.parse(fs.readFileSync(path.join(temporary,'creativeflow-071-profile/collaboration-connections-v1.json'),'utf8'));
+  assert.ok(vault[0].encryptedToken&&!vault[0].token);
+  const invitation=await desktop.evaluate(()=>global.__integrationInvite());
+  const second=await api('/api/v1/invitations/redeem',{invitationCode:invitation.invitationCode,displayName:'第二成员',deviceName:'B'});
+  const snapshot=await api(`/api/v1/workspaces/${second.workspaceId}/integrated/snapshot`,null,second.token);
+  await api(`/api/v1/workspaces/${second.workspaceId}/integrated/commands`,{operationId:crypto.randomUUID(),epoch:snapshot.epoch,commands:[{type:'create',kind:'project',id:'second-project',parentId:null,order:8,fields:{name:'另一位成员的项目'}}]},second.token);
+  await page.getByRole('button',{name:'项目',exact:true}).first().click();
+  await page.getByText('另一位成员的项目',{exact:true}).first().waitFor();
+  await page.getByRole('button',{name:'日历',exact:true}).click();assert.ok(await page.locator('.workspace-content').isVisible());
+  await page.getByRole('button',{name:'设置',exact:true}).click();
+  await page.getByText('导出当前可见资料',{exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'恢复',exact:true}).count(),0,'company space must not offer personal reset');
+  assert.equal(await page.getByRole('button',{name:'选择文件',exact:true}).count(),0,'company space must not offer personal backup replacement');
+  await page.getByRole('button',{name:'集成验收空间',exact:true}).click();await page.getByRole('button',{name:'我的项目',exact:true}).click();
+  assert.equal(await page.evaluate(()=>localStorage.getItem('creative-flow-db-v2')),localBefore,'company edits must not affect local storage');
+  await page.setViewportSize({width:1100,height:780});await page.screenshot({path:path.join(output,'03-local-restored-1100.png')});
+  await page.getByRole('button',{name:'设置',exact:true}).click();await page.getByRole('button',{name:'恢复',exact:true}).waitFor();
+  await page.getByText('创作流 0.7.1 beta · Windows 11 x64 测试版',{exact:true}).waitFor();
+  assert.deepEqual(errors,[]);
+  fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({passed:true,checks:['actual desktop entry','local project creation','native invitation redemption','encrypted credentials','explicit metadata upload','local original unchanged','company project creation in original UI','second member synchronization','calendar navigation','switch back restores personal data','1100x780 viewport','no renderer errors']},null,2));
+  process.stdout.write('Integrated desktop flow passed.\n');
+}
+main().catch(async e=>{console.error(e);if(testPage){await testPage.screenshot({path:path.join(output,'failure.png')}).catch(()=>{});fs.writeFileSync(path.join(output,'failure.txt'),await testPage.locator('body').innerText().catch(()=>''));}process.exitCode=1;}).finally(async()=>{
+  if(desktop)await desktop.close();host.kill();
+  if(host.exitCode===null)await new Promise(resolve=>{host.once('exit',resolve);setTimeout(resolve,2000);});
+  const target=path.resolve(temporary),allowed=path.resolve(os.tmpdir())+path.sep;
+  if(target.startsWith(allowed)&&path.basename(target).startsWith('creativeflow-071-'))fs.rmSync(target,{recursive:true,force:true,maxRetries:3,retryDelay:100});
+});

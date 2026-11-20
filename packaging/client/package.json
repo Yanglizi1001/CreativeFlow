@@ -1,0 +1,59 @@
+{
+  "name": "creative-flow-desktop",
+  "description": "本地项目管理与局域网视频协作审阅工作台",
+  "author": "CreativeFlow",
+  "version": "0.7.1-beta",
+  "private": true,
+  "packageManager": "traversal@1.0.0",
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "com.creativeflow.desktop",
+    "productName": "创作流",
+    "electronVersion": "44.4.3",
+    "electronDist": "../../node_modules/electron/dist",
+    "npmRebuild": false,
+    "asar": true,
+    "directories": {
+      "output": "../../artifacts/builds/2026-11-20-version-management/client"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "icon": "electron/assets/app.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "CreativeFlow-${version}-win-x64.${ext}"
+    },
+    "nsis": {
+      "artifactName": "CreativeFlow-Setup-${version}-win-x64.${ext}",
+      "installerIcon": "electron/assets/app.ico",
+      "uninstallerIcon": "electron/assets/app.ico",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "创作流",
+      "uninstallDisplayName": "创作流"
+    },
+    "portable": {
+      "artifactName": "CreativeFlow-Portable-${version}-win-x64.${ext}"
+    },
+    "fileAssociations": [
+      {
+        "ext": "cfspace",
+        "name": "创作流公司接入文件",
+        "role": "Viewer"
+      }
+    ]
+  }
+}

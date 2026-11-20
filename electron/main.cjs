@@ -4,6 +4,8 @@ const fs = require('fs');
 const { fileURLToPath } = require('url');
 const { readPreferences, writePreferences } = require('./desktop-preferences.cjs');
 const sessionId = require('crypto').randomUUID();
+const { installCollaboration } = require('./collaboration.cjs');
+if(process.env.CREATIVEFLOW_TEST_PROFILE){const directory=path.resolve(process.env.CREATIVEFLOW_TEST_PROFILE);if(!directory.startsWith(path.resolve(require('os').tmpdir())+path.sep)||!path.basename(directory).startsWith('creativeflow-071-'))throw Error('Invalid isolated test profile');app.setPath('userData',directory);app.setPath('crashDumps',path.join(directory,'crashes'));}
 
 let mainWindow;
 let widgetWindow;
@@ -84,7 +86,7 @@ function createTray() {
   tray.on('double-click', restoreMainWindow);
 }
 if (!app.requestSingleInstanceLock()) { app.quit(); }
-app.on('second-instance', restoreMainWindow);
+app.on('second-instance', (_event,args) => {restoreMainWindow();if(require('./employee-access.cjs').queueAccessFile(args))mainWindow?.webContents.send('employee-access:file');});
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -192,6 +194,10 @@ ipcMain.handle('backup:import', async () => {
 });
 
 app.whenReady().then(() => {
+  installCollaboration(app,(sender,frame)=>{
+    if(![mainWindow,widgetWindow].some(window=>window&&!window.isDestroyed()&&window.webContents===sender))return false;
+    try {return frame===sender.mainFrame && path.resolve(fileURLToPath(frame.url.split('#')[0]))===path.resolve(__dirname,'..','dist','index.html');}catch{return false;}
+  });
   desktopPreferences = readPreferences(app.getPath('userData'));
   createTray();
   createWindow();

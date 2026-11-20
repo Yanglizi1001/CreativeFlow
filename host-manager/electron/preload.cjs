@@ -1,0 +1,2 @@
+const {contextBridge,ipcRenderer}=require('electron');
+contextBridge.exposeInMainWorld('hostManager',Object.freeze({invoke:request=>ipcRenderer.invoke('host-manager:invoke',request),choose:label=>ipcRenderer.invoke('host-manager:choose',label),copy:text=>ipcRenderer.invoke('host-manager:copy',text),exportReport:report=>ipcRenderer.invoke('host-manager:report',report),help:()=>ipcRenderer.invoke('host-manager:help')}));

@@ -1,0 +1,3 @@
+const {app,BrowserWindow}=require('electron'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const directory=path.resolve(process.env.CF_LAN_TEST_PROFILE||'');if(!directory.startsWith(path.resolve(os.tmpdir())+path.sep)||!path.basename(directory).startsWith('creativeflow-071-lan-'))throw Error('Isolated profile required');app.setPath('userData',directory);
+app.whenReady().then(()=>{global.__lan=require(process.env.CF_TEST_NETWORK_MODULE||'../electron/collaboration-network.cjs').createCollaborationNetwork();new BrowserWindow({width:400,height:200,show:false}).loadURL('about:blank')});app.on('window-all-closed',()=>app.quit());
