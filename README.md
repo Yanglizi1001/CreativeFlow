@@ -72,7 +72,7 @@
 
 反馈多了以后，可以按来源建立多个清单，例如「自检」「内部审核」「客户第一轮反馈」。每条意见保留正文、完成状态及可选时间码。
 
-- **逐条跟进**：编辑、勾选完成、筛选未完成意见，并按需要排序。
+- **逐条跟进**：编辑、勾选完成、筛选未完成意见，按视频时间码、创建时间或更新时间排序，切换正序／倒序与未完成优先。整体意见可固定在顶部，和时间点意见分区显示。
 - **集中处理**：修改意见中心跨项目查看反馈，同时保留项目、任务、版本和清单来源。
 - **接收外部反馈**：导入 TXT、Markdown、SRT 文本整理修改意见。
 - **带到下一轮**：新增版本时选择继承未完成意见，新旧版本分别维护。
@@ -155,19 +155,23 @@
 
 管理员提供公司接入文件与一次性邀请码，员工在应用内核对主机、确认信任后加入；个人工作时切回「我的项目」。详细步骤见 [部署与使用说明](docs/manuals/0.7.1-beta-部署与使用说明.md)。
 
-### 协作管理器：集中维护公司的主机
+### 内置协作管理器：独立窗口，统一软件
 
-![示例协作管理器：主机状态、空间成员和员工接入信息](docs/screenshots/0.7.1-beta/host-manager.jpg)
+![示例协作管理器：主机状态、空间成员和员工接入信息](docs/screenshots/0.7.1-beta/integrated-host-overview.png)
 
-协作管理器供服务器管理员安装、升级和维护主机，提供安装版与免安装版，内含主机服务和独立运行环境。主机电脑也可以运行客户端参与创作与审阅。
+从应用菜单或设置打开「协作管理器」，以独立窗口展示原有七个管理页面。创作流安装版与免安装版都已内置管理器、主机服务安装资源和独立运行环境，无需再安装另一款软件。主机电脑也可以在普通权限主窗口中参与创作与审阅。
+
+员工选择「配置当前电脑接入」返回原有加入流程；服务器管理员选择「授权管理本机」，确认 Windows 权限提示后管理当前电脑。主窗口继续普通运行，重复打开只唤起已有管理窗口。
+
+![示例员工入口：配置当前电脑接入，或按需授权管理本机](docs/screenshots/0.7.1-beta/employee-entry.png)
 
 管理器集中处理邀请码、管理员与成员、设备接入、网络检测和公司接入文件；支持自定义存储位置、备份恢复、迁移，以及卸载时选择是否保留数据。
 
-服务开机启动与管理器登录自启分别设置。空间容量上限和最低磁盘余量可调整，容量不足时限制新增视频上传，保留已有资料。操作步骤见 [协作管理器说明](docs/manuals/协作主机管理器-使用说明.md)。
+服务开机启动、登录后启动创作流、启动后打开管理窗口分别设置。空间容量上限和最低磁盘余量可调整，容量不足时限制新增视频上传，保留已有资料。操作步骤见 [内置协作管理说明](docs/manuals/0.7.1-beta-内置协作管理使用说明.md)。
 
 ## 下载安装
 
-当前版本为 **0.7.1 beta · Windows x64**，已在 Windows 11 验证。个人使用下载桌面软件即可；团队需要时再部署协作主机。
+当前版本为 **0.7.1 beta · Windows x64**，本次更新批次为 **2026-11-21-integrated-manager**，已在 Windows 11 验证。个人使用下载桌面软件即可；团队需要时再部署协作主机。
 
 | 桌面软件 | 使用方式 |
 | --- | --- |
@@ -179,19 +183,18 @@
 <details>
 <summary><b>团队部署与完整下载</b></summary>
 
-- [完整包](https://github.com/Yanglizi1001/CreativeFlow/releases/download/0.7.1-beta/CreativeFlow-Full-0.7.1-beta-win-x64.zip)：桌面软件、协作管理器各含安装版与免安装版，附带主机运行环境、维护工具和说明书。
-- [协作管理器安装版](https://github.com/Yanglizi1001/CreativeFlow/releases/download/0.7.1-beta/CreativeFlow-HostManager-Setup-0.7.1-beta-win-x64.exe) · [协作管理器免安装版](https://github.com/Yanglizi1001/CreativeFlow/releases/download/0.7.1-beta/CreativeFlow-HostManager-Portable-0.7.1-beta-win-x64.exe)，运行时需要管理员授权。
+- [完整包](https://github.com/Yanglizi1001/CreativeFlow/releases/download/0.7.1-beta/CreativeFlow-Full-0.7.1-beta-win-x64.zip)：创作流安装版与免安装版，均含内置管理窗口、主机运行资源，附带统一使用说明与验证记录。
 - [SHA256SUMS.txt](https://github.com/Yanglizi1001/CreativeFlow/releases/download/0.7.1-beta/SHA256SUMS.txt)：下载文件校验值。
 
-已有公司空间先更新管理器，执行「设置与维护 → 升级现有主机」，沿用原程序与数据目录并自动备份，再更新员工客户端。原公司空间、成员和视频继续保留，已有视频无需重新上传。
+已有公司空间先更新服务器电脑上的创作流，打开内置管理器识别原主机；早期后台需要升级时执行「设置与维护 → 升级现有主机」，先自动备份并沿用原目录、证书、成员及数据。确认内置管理器正常后，只卸载旧独立管理器软件，不要卸载协作服务或重新建立空间。随后更新员工客户端，已有视频无需重新上传。
 
 </details>
 
 ## 使用说明与更新记录
 
 - [版本管理与升级说明](docs/manuals/0.7.1-beta-版本管理更新说明.md)
-- [部署与使用说明](docs/manuals/0.7.1-beta-部署与使用说明.md) · [PDF](docs/manuals/pdf/Deployment-Guide.pdf)
-- [协作管理器说明](docs/manuals/协作主机管理器-使用说明.md) · [PDF](docs/manuals/pdf/HostManager-Guide.pdf)
+- [内置管理部署与使用说明](docs/manuals/0.7.1-beta-内置协作管理使用说明.md) · [PDF](docs/manuals/pdf/Unified-Guide.pdf)
+- [内置协作管理说明](docs/manuals/0.7.1-beta-内置协作管理使用说明.md) · [PDF](docs/manuals/pdf/Unified-Guide.pdf)
 - [0.7.1 beta 更新记录](docs/releases/0.7.1-beta.md) · [历史更新](CHANGELOG.md) · [验收范围](docs/releases/0.7.1-beta-validation.md)
 
 <details>
@@ -212,7 +215,7 @@ pnpm electron:dev
 pnpm test
 ~~~
 
-完整构建协作主机与四个 Windows 程序还需要 .NET 8 SDK：
+完整构建协作主机与两个统一 Windows 程序还需要 .NET 8 SDK：
 
 ~~~powershell
 dotnet restore collaboration-dev/tests/CreativeFlow.Host.Tests/CreativeFlow.Host.Tests.csproj -r win-x64
@@ -225,3 +228,4 @@ pnpm package:build-only
 </details>
 
 欢迎通过 [Issues](https://github.com/Yanglizi1001/CreativeFlow/issues) 反馈版本、Windows 环境、复现步骤和截图。[0.7.0 beta3](https://github.com/Yanglizi1001/CreativeFlow/releases/tag/0.7.0-beta.3) 保留用于追溯。
+

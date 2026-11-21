@@ -1,3 +1,4 @@
+import {useOpinionSorting,useOpinionSorter,OpinionSortControls,OpinionGroups,OpinionStamp,opinionTimeTitle} from './OpinionSorting';
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button, Check, Icon, Modal, StatusTag } from './ui';
@@ -5,7 +6,7 @@ import { isGeneralOpinion, orderedOpinions, opinionPayload } from './opinions';
 import {can,canEditOpinion} from './collaboration/permissions';
 import {usePersistentDraft} from './collaboration/drafts';
 
-export const ReviewNotes=forwardRef(function ReviewNotes({flow,project,task,version,current,duration,formatTime,selected,onSelect,onGuardChange,toast},ref){
+export const ReviewNotes=forwardRef(function ReviewNotes({flow,project,task,version,current,duration,formatTime,selected,onSelect,onGuardChange,toast,sorting,setSorting,sortError},ref){
   const [editor,setEditor,draftError]=usePersistentDraft(`review:${flow.space?.id||'personal'}:${version.id}`);
   const [error,setError]=useState(''),[busy,setBusy]=useState(false),[pending,setPending]=useState(null),[context,setContext]=useState(null);
   const textarea=useRef(),container=useRef(),menu=useRef(),saving=useRef(false);
@@ -45,15 +46,18 @@ export const ReviewNotes=forwardRef(function ReviewNotes({flow,project,task,vers
   useEffect(()=>{if(!editor)return;const item=version.lists.find(l=>l.id===editor.listId)?.items.find(i=>i.id===editor.id);if(editor.id&&!item){if(dirtyRef.current)setError('该意见已删除或访问权限已改变，草稿已保留，请复制后取消编辑。');else{setEditor(null);setError('');}}},[version.lists]);
   useEffect(()=>{const key=e=>{if(e.defaultPrevented||document.querySelector('[role="dialog"]'))return;if(e.key==='Escape'&&(editor||context)){e.preventDefault();e.stopPropagation();context?setContext(null):cancel();}};document.addEventListener('keydown',key);return()=>document.removeEventListener('keydown',key);},[editor,context,dirty]);
   useEffect(()=>{if(!context)return;const outside=e=>{if(!menu.current?.contains(e.target))setContext(null);};document.addEventListener('pointerdown',outside);requestAnimationFrame(()=>menu.current?.querySelector('button')?.focus());return()=>document.removeEventListener('pointerdown',outside);},[context]);
-  const rows=orderedOpinions(activeList?.items);
+  const sortRows=useOpinionSorter(sorting,Boolean(editor));
+  const rows=sortRows(activeList?.items||[],activeList?.id);
+  useEffect(()=>{if(selected?.id&&!editor)requestAnimationFrame(()=>container.current?.querySelector('[data-opinion-id="'+CSS.escape(selected.id)+'"]')?.scrollIntoView({block:'nearest'}));},[selected?.id,sorting]);
   return <>
     <div className="review-list-tabs">{version.lists.map(list=>{const done=list.items.filter(i=>i.done).length;return <button key={list.id} className={activeList?.id===list.id?'active':''} onClick={()=>guard(()=>flow.chooseList(list.id))}>{list.name}<em>{done}/{list.items.length}</em></button>;})}</div>
+    <OpinionSortControls value={sorting} onChange={setSorting} error={sortError} disabled={Boolean(editor)} scope="review" compact/>
     <div className="review-note-list" ref={container} role="list" aria-label="修改意见列表" onClick={e=>{if(!e.target.closest('.review-note-row')&&!dirty&&!busy){setEditor(null);onSelect(null,null);}}} onKeyDown={e=>{if(e.key==='Delete'&&!document.querySelector('[role="dialog"]')&&e.target.closest('.review-note-row')&&!e.target.closest('input,textarea,button') ){const id=e.target.closest('.review-note-row').dataset.opinionId;const list=activeList,item=list?.items.find(i=>i.id===id);if(item){e.preventDefault();remove(list,item);}}}}>
-      {rows.map((item,index)=><div role="listitem" tabIndex="0" data-opinion-id={item.id} key={item.id} onFocus={e=>{if(e.target===e.currentTarget)onSelect(activeList.id,item,false);}} className={`review-note-row ${item.done?'done':''} ${selected?.id===item.id?'selected':''}`} onClick={()=>edit(activeList,item)} onKeyDown={e=>{if(e.key==='Enter'&&e.target===e.currentTarget){e.preventDefault();edit(activeList,item);}}} onContextMenu={e=>{e.preventDefault();const open=()=>{onSelect(activeList.id,item,false);setContext({item,list:activeList,x:Math.min(e.clientX,window.innerWidth-190),y:Math.min(e.clientY,window.innerHeight-95)});};if(editor?.id!==item.id&&dirty)guard(open);else open();}}>
-        <span className="opinion-check" onClick={e=>e.stopPropagation()}><Check disabled={!canEditOpinion(flow,version,item)} checked={item.done} label={item.text} onChange={()=>{if(canEditOpinion(flow,version,item))flow.toggleItemAt(project.id,task.id,version.id,activeList.id,item.id);}}/></span><span>{index+1}</span>
+      <OpinionGroups disabled={Boolean(editor)} entries={rows} value={sorting} onChange={setSorting}>{groupRows=>groupRows.map((item,index)=><div role="listitem" tabIndex="0" data-opinion-id={item.id} title={opinionTimeTitle(item)} key={item.id} onFocus={e=>{if(e.target===e.currentTarget)onSelect(activeList.id,item,false);}} className={`review-note-row ${item.done?'done':''} ${selected?.id===item.id?'selected':''}`} onClick={()=>edit(activeList,item)} onKeyDown={e=>{if(e.key==='Enter'&&e.target===e.currentTarget){e.preventDefault();edit(activeList,item);}}} onContextMenu={e=>{e.preventDefault();const open=()=>{onSelect(activeList.id,item,false);setContext({item,list:activeList,x:Math.min(e.clientX,window.innerWidth-190),y:Math.min(e.clientY,window.innerHeight-95)});};if(editor?.id!==item.id&&dirty)guard(open);else open();}}>
+        <span className="opinion-check" onClick={e=>e.stopPropagation()}><Check disabled={!canEditOpinion(flow,version,item)} checked={item.done} label={item.text} onChange={()=>{if(canEditOpinion(flow,version,item))flow.toggleItemAt(project.id,task.id,version.id,activeList.id,item.id);}}/></span><span>{rows.indexOf(item)+1}</span>
         <button className={'review-opinion-time '+(isGeneralOpinion(item)?'general-opinion':'')} title={isGeneralOpinion(item)?'针对整部视频的意见':'定位视频时间'} onClick={e=>{e.stopPropagation();locate(activeList.id,item);}}>{item.time||'整体'}</button>
-        <strong>{item.text}</strong><StatusTag value={item.done?'已完成':'未完成'} kind="opinion" compact/>
-      </div>)}
+        <strong>{item.text}<OpinionStamp item={item} value={sorting}/></strong><StatusTag value={item.done?'已完成':'未完成'} kind="opinion" compact/>
+      </div>)}</OpinionGroups>
       {!rows.length?<div className="inline-empty">当前列表还没有修改意见</div>:null}
     </div>
     {editor?<form className="review-add review-composer" onSubmit={e=>{e.preventDefault();save();}} onKeyDown={e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();save();}}}>

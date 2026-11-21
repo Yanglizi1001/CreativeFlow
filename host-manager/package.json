@@ -14,7 +14,7 @@
     "npmRebuild": false,
     "asar": true,
     "directories": {
-      "output": "../artifacts/builds/2026-11-20-version-management/manager"
+      "output": "../artifacts/builds/2026-11-21-integrated-manager/manager"
     },
     "files": [
       "dist/**/*",

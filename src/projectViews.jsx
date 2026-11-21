@@ -1,3 +1,4 @@
+import {useOpinionSorting,useOpinionSorter,OpinionSortControls,OpinionGroups,OpinionStamp,opinionTimeTitle} from './OpinionSorting';
 import { Thumbnail } from './Thumbnail';
 import {usePersistentDraft} from './collaboration/drafts';
 import {can,canEditOpinion} from './collaboration/permissions';
@@ -130,7 +131,7 @@ function FileRow({ flow, toast, onReview }) {
 
 function Checklist({ flow, toast }) {
   const [filter, setFilter] = useState(false);
-  const [sort, setSort] = useState('default');
+  const [sorting,setSorting,sortError]=useOpinionSorting('task',flow.space);
   const [draftRecord,setDraftRecord]=usePersistentDraft(`quick:${flow.space?.id||'personal'}:${flow.active.version?.id}:${flow.active.list?.id}`);
   const draft=draftRecord?.text||'',setDraft=text=>setDraftRecord(text?{text}:null);
   const [editDraft,setEditDraft,draftError]=usePersistentDraft(`task:${flow.space?.id||'personal'}:${flow.active.version?.id}:editor`);
@@ -140,12 +141,8 @@ function Checklist({ flow, toast }) {
   const editRowRef = useRef(null);
   const lists = flow.active.version?.lists || [];
   const list = flow.active.list;
-  const rows = useMemo(() => {
-    const source = filter ? (list?.items || []).filter(row => !row.done) : [...(list?.items || [])];
-    if (sort === 'time') source.sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
-    if (sort === 'status') source.sort((a, b) => Number(a.done) - Number(b.done));
-    return source;
-  }, [list, filter, sort]);
+  const sortRows=useOpinionSorter(sorting,Boolean(editing));
+  const rows=sortRows((list?.items||[]).filter(row=>!filter||!row.done||row.id===editing),list?.id);
   const add = async event => {
     event.preventDefault();
     const value = draft.trim();
@@ -179,8 +176,8 @@ function Checklist({ flow, toast }) {
   }, [editing, editDraft]);
   if (!lists.length) return <section className="empty-state"><Icon name="comment" size={34} /><h2>为这个版本建立第一份修改清单</h2><p>可以按自检、内部反馈或客户轮次自由创建。</p><Button variant="primary" icon="plus" onClick={() => document.dispatchEvent(new Event('new-list'))}>新建修改清单</Button></section>;
   return <><div className="list-tabs">{lists.map(entry => { const progress = countItems(entry); return <button key={entry.id} className={list?.id === entry.id ? 'active' : ''} onClick={() => flow.chooseList(entry.id)}><span>{entry.name}</span><em>{progress.done}/{progress.total}</em></button>; })}<button className="add-list" onClick={() => document.dispatchEvent(new Event('new-list'))}><Icon name="plus" />新增列表</button></div>
-    <div className="check-toolbar"><div><Button disabled={!can(flow,flow.active.version,'comment')} icon="download" onClick={() => importRef.current.click()}>导入意见</Button><Button disabled={!can(flow,flow.active.version,'edit')} className="danger-action" icon="trash" onClick={() => setDeleteListOpen(true)}>删除当前列表</Button><input ref={importRef} type="file" accept=".txt,.md,.srt" hidden onChange={importing} /><label className="filter"><Check checked={filter} onChange={event => setFilter(event.target.checked)} label="仅看未完成" />仅看未完成</label></div><AcrylicSelect value={sort} label="排序" onChange={setSort} options={[{ value: 'default', label: '默认顺序' }, { value: 'time', label: '按时间码' }, { value: 'status', label: '未完成优先' }]} /></div>
-    <div className="check-table"><div className="table-head"><span /><span>#</span><span>时间点</span><span>修改意见</span><span>状态</span><span>操作</span></div>{rows.map((row, index) => <div ref={editing === row.id ? editRowRef : null} className={`check-row ${row.done ? 'done' : ''}`} key={row.id}><Check disabled={!canEditOpinion(flow,flow.active.version,row)} checked={row.done} onChange={() => flow.toggleItem(row.id)} label={row.text} /><span>{index + 1}</span>{editing === row.id ? <><input className="time-input" value={editDraft.time} onChange={event => setEditDraft(current => ({ ...current, time: event.target.value }))} /><input className="text-input" autoFocus value={editDraft.text} onChange={event => setEditDraft(current => ({ ...current, text: event.target.value }))} onKeyDown={event => { if (event.key === 'Enter') commitEdit(); if (event.key === 'Escape') setEditing(null); }} /></> : <><button className={"timecode "+(!row.time?'general-opinion':'')} onClick={() => startEdit(row)}>{row.time || '整体'}</button><button className="item-text" onClick={() => startEdit(row)}>{row.text}</button></>}<span className={`status ${row.done ? 'done' : ''}`}>{row.done ? '已完成' : '未完成'}</span><span className="row-actions"><button onClick={() => editing === row.id ? commitEdit() : startEdit(row)}><Icon name="edit" /></button><button onClick={() => flow.removeItem(row.id)}><Icon name="trash" /></button></span></div>)}</div>
+    <div className="check-toolbar"><div><Button disabled={!can(flow,flow.active.version,'comment')} icon="download" onClick={() => importRef.current.click()}>导入意见</Button><Button disabled={!can(flow,flow.active.version,'edit')} className="danger-action" icon="trash" onClick={() => setDeleteListOpen(true)}>删除当前列表</Button><input ref={importRef} type="file" accept=".txt,.md,.srt" hidden onChange={importing} /><label className="filter"><Check checked={filter} onChange={event => setFilter(event.target.checked)} label="仅看未完成" />仅看未完成</label></div><OpinionSortControls value={sorting} onChange={setSorting} error={sortError} disabled={Boolean(editing)} scope="task"/></div>
+    <div className="check-table"><div className="table-head"><span /><span>#</span><span>时间点</span><span>修改意见</span><span>状态</span><span>操作</span></div><OpinionGroups disabled={Boolean(editing)} entries={rows} value={sorting} onChange={setSorting}>{groupRows=>groupRows.map((row, index) => <div ref={editing === row.id ? editRowRef : null} data-opinion-id={row.id} title={opinionTimeTitle(row)} className={`check-row ${row.done ? 'done' : ''}`} key={row.id}><Check disabled={!canEditOpinion(flow,flow.active.version,row)} checked={row.done} onChange={() => flow.toggleItem(row.id)} label={row.text} /><span>{rows.indexOf(row) + 1}</span>{editing === row.id ? <><input className="time-input" value={editDraft.time} onChange={event => setEditDraft(current => ({ ...current, time: event.target.value }))} /><input className="text-input" autoFocus value={editDraft.text} onChange={event => setEditDraft(current => ({ ...current, text: event.target.value }))} onKeyDown={event => { if (event.key === 'Enter') commitEdit(); if (event.key === 'Escape') setEditing(null); }} /></> : <><button className={"timecode "+(!row.time?'general-opinion':'')} onClick={() => startEdit(row)}>{row.time || '整体'}</button><button className="item-text" onClick={() => startEdit(row)}>{row.text}<OpinionStamp item={row} value={sorting}/></button></>}<span className={`status ${row.done ? 'done' : ''}`}>{row.done ? '已完成' : '未完成'}</span><span className="row-actions"><button onClick={() => editing === row.id ? commitEdit() : startEdit(row)}><Icon name="edit" /></button><button onClick={() => flow.removeItem(row.id)}><Icon name="trash" /></button></span></div>)}</OpinionGroups></div>
     <form className="quick-add" onSubmit={add}><Icon name="plus" /><input value={draft} onChange={event => setDraft(event.target.value)} disabled={!can(flow,flow.active.version,'comment')} placeholder="输入修改意见；可用“00:32 音乐提前进入”自动识别时间码" /><button disabled={!can(flow,flow.active.version,'comment')}>添加</button></form>{deleteListOpen ? <Modal title={`删除修改清单「${list?.name || ''}」`} onClose={() => setDeleteListOpen(false)} footer={<><Button onClick={() => setDeleteListOpen(false)}>取消</Button><Button className="danger-confirm" icon="trash" onClick={() => { flow.deleteList(); setDeleteListOpen(false); toast('修改清单已删除'); }}>确认删除</Button></>}><p className="dialog-copy">将删除此列表及其中 {list?.items.length || 0} 条修改意见，其他列表和版本不会受影响。</p><p className="form-hint">本次运行中可使用 Ctrl+Z 撤销，原始文件不受影响。</p></Modal> : null}</>;
 }
 

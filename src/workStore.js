@@ -1,3 +1,4 @@
+import {stampOpinionChanges} from './opinionSort.mjs';
 import { APP_STORAGE_KEY, cloneSeedData } from './data';
 import { migrateColors } from './colors';
 import { validDatabase } from './validateDatabase';
@@ -37,7 +38,7 @@ export const workStore={
   getSnapshot:()=>snapshot,
   flush(){return locked(()=>latest().db);},
   change(updater,label='更新工作数据',options={}) {
-    return locked(()=>{const {db,history}=latest();const next=typeof updater==='function'?updater(db):updater;if(JSON.stringify(next)===JSON.stringify(db))return;
+    return locked(()=>{const {db,history}=latest();const next=stampOpinionChanges(db,typeof updater==='function'?updater(db):updater);if(JSON.stringify(next)===JSON.stringify(db))return;
       const operationId=crypto.randomUUID();const h=options.history===false?history:addHistory(history,db,next,label,operationId);save(next,h);return operationId;
     });
   },

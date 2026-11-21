@@ -1,3 +1,4 @@
+import {stampOpinionChanges} from '../opinionSort.mjs';
 import {versionSignature} from '../versionLifecycle.mjs';
 import {workStore as personalStore} from '../workStore';
 import {createEntityCommands,materializeDatabase,prepareProjectUpload} from './model.mjs';
@@ -43,7 +44,7 @@ export const workspaceStore={
     const id=nativeState.space.id;
     return serial(async()=>{
       if(nativeState.space?.id!==id)throw Error('空间已切换，请重新选择内容');
-      receive(await api().spaceState(id));const before=snapshot.db,next=typeof updater==='function'?updater(before):updater;
+      receive(await api().spaceState(id));const before=snapshot.db,next=stampOpinionChanges(before,typeof updater==='function'?updater(before):updater);
       const revisions=Object.fromEntries(nativeState.data.entities.map(row=>[row.id,row.revision]));
       let commands=createEntityCommands(before,next,revisions);
       // Viewers read duration from the player without writing shared metadata.

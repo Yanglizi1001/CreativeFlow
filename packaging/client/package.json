@@ -14,11 +14,13 @@
     "npmRebuild": false,
     "asar": true,
     "directories": {
-      "output": "../../artifacts/builds/2026-11-20-version-management/client"
+      "output": "../../artifacts/builds/2026-11-21-integrated-manager/client"
     },
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "host-manager/electron/**/*",
+      "host-manager/dist/**/*",
       "package.json"
     ],
     "win": {
@@ -43,7 +45,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "创作流",
-      "uninstallDisplayName": "创作流"
+      "uninstallDisplayName": "创作流",
+      "include": "electron/unified-installer.nsh"
     },
     "portable": {
       "artifactName": "CreativeFlow-Portable-${version}-win-x64.${ext}"
@@ -53,6 +56,12 @@
         "ext": "cfspace",
         "name": "创作流公司接入文件",
         "role": "Viewer"
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "../../host-manager/resources",
+        "to": "collaboration-host"
       }
     ]
   }

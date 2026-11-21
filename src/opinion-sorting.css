@@ -1,0 +1,43 @@
+.opinion-sort-controls{display:flex;flex-direction:column;align-items:stretch;gap:5px;padding:10px 0;min-width:0;flex-shrink:0}
+.opinion-sort-row{display:flex;align-items:center;flex-wrap:nowrap;gap:6px;white-space:nowrap}
+.opinion-sort-row>*{flex-shrink:0}
+.opinion-sort-row>label{display:inline-flex;align-items:center;gap:5px;font-size:12px;white-space:nowrap;margin:0}
+.opinion-sort-row>label>input[type=checkbox]{position:static;opacity:1;display:inline-block;width:14px;height:14px;margin:0;min-width:14px;accent-color:#514959}
+.opinion-sort-row>.acrylic-select{min-width:120px;width:120px;flex:0 0 120px}
+.opinion-sort-row>.button{height:32px;padding:0 8px;font-size:12px;min-width:44px}
+.opinion-sort-row>.button[aria-label="切换意见排序方向"]{min-width:68px}
+.opinion-sort-controls.compact{padding:8px 12px;border-bottom:1px solid var(--line,#e5e1eb)}
+.opinion-sort-hint,.opinion-date{font-size:11px;color:var(--muted,#82768f);font-weight:400}
+.opinion-date{display:block;margin-top:3px;white-space:nowrap}
+.opinion-source{display:block;font-size:11px;color:#82768f;font-weight:400;margin-top:3px}
+.opinion-section{display:block;min-width:0;width:100%;margin:0;overflow:hidden}
+.opinion-section-general{position:relative;border-radius:6px;background:#f5f0fa}
+.opinion-section-general:after{content:"";position:absolute;inset:0;border:1px solid #d6c9e6;border-left:3px solid #9577b5;border-radius:6px;pointer-events:none}
+.opinion-section+.opinion-section{margin-top:10px}
+.opinion-section .opinion-general-heading,.opinion-section .opinion-timed-heading{display:flex;flex-flow:row nowrap;align-items:center;justify-content:space-between;gap:10px;width:100%;min-width:0;height:36px;min-height:36px;padding:0 10px;border:0;border-bottom:1px solid #ddd2e9;background:#eee6f6;color:#5c456f;text-align:left;writing-mode:horizontal-tb;white-space:nowrap;font:inherit;font-size:12px}
+.opinion-section .opinion-general-heading:hover:not(:disabled){background:#e7dbf1}
+.opinion-section .opinion-general-heading:focus-visible{outline:2px solid #6e8ebc;outline-offset:-2px}
+.opinion-section .opinion-general-heading:disabled{cursor:default;opacity:.7}
+.opinion-heading-title{display:inline-flex;flex-flow:row nowrap;align-items:center;gap:6px;min-width:0;white-space:nowrap}
+.opinion-heading-title strong{font-size:12px;font-weight:600;white-space:nowrap}
+.opinion-section .opinion-general-heading>small,.opinion-section .opinion-timed-heading>small{font-size:10px;color:#79668b;white-space:nowrap;flex-shrink:0}
+.opinion-section .opinion-timed-heading{background:#f7f6f9;border-color:#e5e1eb;color:#655d6f}
+.opinion-section-general :is(.check-row,.review-note-row,.feedback-item,.widget-feedback-row){background:#faf6fd;border-color:#e7ddef}
+.opinion-section-general :is(.check-row,.review-note-row,.feedback-item,.widget-feedback-row):hover{background:#f0e7f8}
+.opinion-section-general .review-note-row.selected{background:#e7d9f3;box-shadow:inset 3px 0 #7e5ba0}
+.opinion-section-general .general-opinion{background:#e5d7f0;color:#62467c}
+.review-note-list>.opinion-section{width:calc(100% - 16px);margin:8px}
+.check-table>.opinion-section{width:100%;margin:6px 0}
+.feedback-bundle>.opinion-section{width:calc(100% - 12px);margin:6px}
+.widget-task-group>.opinion-section{width:calc(100% - 10px);margin:5px}
+.check-toolbar{flex-wrap:wrap}.check-toolbar>.opinion-sort-controls{margin-left:auto}
+.review-recent header strong{font-size:12px}
+.widget-surface>.opinion-sort-controls{flex-shrink:0}
+.review-workspace{grid-template-columns:minmax(320px,1fr) var(--review-notes-width,600px)!important;grid-template-rows:auto minmax(0,1fr)!important}
+.review-workspace.notes-closed{grid-template-columns:minmax(0,1fr)!important}
+.review-workspace .review-notes{min-width:560px;min-height:0;overflow:hidden;border-top:0;border-left:1px solid var(--line)}
+.review-workspace .review-note-row{grid-template-columns:18px 20px 50px minmax(0,1fr) auto;gap:6px}
+.review-workspace.review-stacked{display:flex!important;flex-direction:column;overflow-y:auto}
+.review-workspace.review-stacked>.review-workspace-head,.review-workspace.review-stacked>.review-player-column{flex:none}
+.review-workspace.review-stacked>.review-notes{flex:none;min-height:360px;height:65vh;width:100%;border-left:0;border-top:1px solid var(--line)}
+.review-workspace.review-stacked .review-notes>.resize-handle{display:none}

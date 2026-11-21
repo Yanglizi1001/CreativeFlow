@@ -9,6 +9,26 @@ namespace CreativeFlow.Host.Tests;
 
 public sealed class IntegratedWorkspaceTests
 {
+    [Fact]
+    public async Task OpinionTimesPreserveOfflineCreationAndSeparateStatusFromContent()
+    {
+        await using var env=new Environment();await env.Initialize();await env.Seed();
+        await env.Service.ApplyAsync(env.Owner,env.Batch(Create("opinion","dated","l","""{"text":"离线意见","time":"00:00","done":false,"createdAt":"2026-01-01T08:00:00.000Z","updatedAt":"2026-01-01T08:00:00.000Z"}""")));
+        async Task<JsonObject> Row()=> (await env.Service.SnapshotAsync(env.Owner)).Entities.Single(e=>e.Id=="dated").Fields;
+        var before=await Row();Assert.Equal("2026-01-01T08:00:00.000Z",before["createdAt"]!.GetValue<string>());
+        await env.Service.ApplyAsync(env.Owner,env.Batch(Update("opinion","dated","""{"done":true}""","""{"done":false}""")));
+        var status=await Row();Assert.Equal(before["updatedAt"]!.ToJsonString(),status["updatedAt"]!.ToJsonString());Assert.NotNull(status["statusChangedAt"]);
+        await env.Service.ApplyAsync(env.Owner,env.Batch(Update("opinion","dated","""{"text":"旧客户端修改"}""","""{"text":"离线意见"}""")));
+        var edited=await Row();Assert.NotEqual(before["updatedAt"]!.ToJsonString(),edited["updatedAt"]!.ToJsonString());Assert.Equal(before["createdAt"]!.ToJsonString(),edited["createdAt"]!.ToJsonString());
+        await Assert.ThrowsAsync<ArgumentException>(()=>env.Service.ApplyAsync(env.Owner,env.Batch(Update("opinion","dated","""{"createdAt":"2026-02-01T00:00:00Z"}""","""{"createdAt":"2026-01-01T08:00:00.000Z"}"""))));
+    }
+    [Fact]
+    public async Task LegacyUploadDoesNotInventCreationTime()
+    {
+        await using var env=new Environment();await env.Initialize();await env.Seed();
+        await env.Service.ApplyAsync(env.Owner,env.Batch(Create("opinion","legacy","l","""{"text":"历史意见","timeOrigin":"legacy","done":false}""")));
+        var row=(await env.Service.SnapshotAsync(env.Owner)).Entities.Single(e=>e.Id=="legacy");Assert.Null(row.Fields["createdAt"]);
+    }
     private sealed class Environment : IAsyncDisposable
     {
         private readonly string directory=Path.Combine(Path.GetTempPath(),"creativeflow-integrated-"+Guid.NewGuid().ToString("N"));

@@ -1,6 +1,6 @@
 const {spawn}=require('node:child_process');
 const path=require('node:path');
-const allowed=new Set(['status','diagnose','install','adopt','reattach','start','stop','autostart','manager-startup','storage-status','storage-configure','storage-cleanup','firewall','manage','backup','backup-schedule','migrate-data','migrate-program','restore','upgrade','export-access','uninstall']);
+const allowed=new Set(['public-status','status','diagnose','install','adopt','reattach','start','stop','autostart','manager-startup','storage-status','storage-configure','storage-cleanup','firewall','manage','backup','backup-schedule','migrate-data','migrate-program','restore','upgrade','export-access','uninstall']);
 class Controller {
   constructor(resources){this.resources=resources;this.running=false;this.child=null;}
   async invoke(request){

@@ -22,7 +22,7 @@ public sealed partial class IntegratedWorkspaceService(CollaborationDatabase dat
         ["project"] = ["name","description","notes","status","type","start","due","color","defaultColor","archived"],
         ["task"] = ["versionSequence","name","description","notes","status","type","start","due","color","defaultColor"],
         ["version"] = ["name","status","createdAt","file","duration"],
-        ["list"] = ["name"], ["opinion"] = ["text","time","done","status"],
+        ["list"] = ["name"], ["opinion"] = ["text","time","done","status","createdAt","updatedAt","statusChangedAt","timeOrigin","inheritedFrom","sourceCreatedAt"],
         ["preferences"] = ["customOptions","tagColors"]
     };
     private static readonly Dictionary<string,string> ParentKinds = new() { ["task"]="project",["version"]="task",["list"]="version",["opinion"]="list" };
@@ -89,6 +89,7 @@ public sealed partial class IntegratedWorkspaceService(CollaborationDatabase dat
     private static bool ProjectManager(DeviceIdentity actor, IntegratedEntity row, Dictionary<string,IntegratedEntity> rows) =>
         actor.Role=="owner" || Ancestor(row,"project",rows)?.CreatedBy==actor.MemberId;
     private static bool WorkEquals(string kind,JsonObject left,JsonObject right) {
+        if(kind=="opinion"){var x=(JsonObject)left.DeepClone();var y=(JsonObject)right.DeepClone();foreach(var key in OpinionMetadata){x.Remove(key);y.Remove(key);}return JsonNode.DeepEquals(x,y);}
         if(kind=="task"){var x=(JsonObject)left.DeepClone();var y=(JsonObject)right.DeepClone();x.Remove("versionSequence");y.Remove("versionSequence");return JsonNode.DeepEquals(x,y);}
         if(kind!="version")return JsonNode.DeepEquals(left,right);
         var a=(JsonObject)left.DeepClone();var b=(JsonObject)right.DeepClone();a.Remove("duration");b.Remove("duration");return JsonNode.DeepEquals(a,b);
@@ -145,6 +146,7 @@ public sealed partial class IntegratedWorkspaceService(CollaborationDatabase dat
             foreach(var pair in change.Fields) {
                 if(pair.Value is null)continue;
                 if(pair.Key is "done" or "archived") {if(pair.Value is not JsonValue b||!b.TryGetValue<bool>(out _))throw new ArgumentException("无效的完成或归档状态");}
+                else if(change.Kind=="opinion"&&pair.Key is "createdAt" or "updatedAt" or "statusChangedAt" or "sourceCreatedAt") {if(pair.Value is not JsonValue date||!date.TryGetValue<string>(out _)||!OpinionTime(pair.Value,out _))throw new ArgumentException("无效的意见时间");}
                 else if(pair.Key=="versionSequence") {if(change.Kind!="task"||pair.Value is not JsonValue seq||!seq.TryGetValue<int>(out var number)||number<0)throw new ArgumentException("无效的版本序号");}
                 else if(pair.Key=="duration") {if(pair.Value is not JsonValue n||!n.TryGetValue<double>(out var duration)||duration<0)throw new ArgumentException("无效的时长");}
                 else if(pair.Key=="file")throw new ArgumentException("请通过发布视频功能关联协作媒体，不能同步本机路径");
@@ -206,7 +208,7 @@ public sealed partial class IntegratedWorkspaceService(CollaborationDatabase dat
                     var needed=change.Kind is "opinion" or "list" ? 2:4;
                     if(await Access(connection,transaction,actor,parent!,rows)<needed)throw new IntegratedDenied("没有创建权限");
                 }
-                var entity=new IntegratedEntity(change.Kind,change.Id,change.ParentId,change.Order,(JsonObject)change.Fields!.DeepClone(),1,actor.MemberId);
+                var entity=new IntegratedEntity(change.Kind,change.Id,change.ParentId,change.Order,change.Kind=="opinion"?StampOpinion(change.Fields!,null):(JsonObject)change.Fields!.DeepClone(),1,actor.MemberId);
                 if(entity.Kind=="version"&&rows.Values.Any(r=>r.Kind=="version"&&r.ParentId==entity.ParentId&&string.Equals(r.Fields["name"]?.GetValue<string>()?.Trim(),entity.Fields["name"]?.GetValue<string>()?.Trim(),StringComparison.OrdinalIgnoreCase)))throw new IntegratedConflict("版本名称已存在，请重新命名");
                 await Write(connection,transaction,actor.WorkspaceId,entity,false);rows.Add(entity.Id,entity);
             } else {
@@ -224,14 +226,14 @@ public sealed partial class IntegratedWorkspaceService(CollaborationDatabase dat
                     rows.Remove(existing.Id);
                 } else {
                     // Compare only edited fields, allowing independent calendar/opinion edits.
-                    foreach(var pair in change.Fields!) if(change.Expected is null || !change.Expected.ContainsKey(pair.Key) || !JsonNode.DeepEquals(existing.Fields[pair.Key],change.Expected[pair.Key])&&!JsonNode.DeepEquals(existing.Fields[pair.Key],pair.Value))
+                    foreach(var pair in change.Fields!) if(!(existing.Kind=="opinion"&&OpinionMetadata.Contains(pair.Key))&&(change.Expected is null || !change.Expected.ContainsKey(pair.Key) || !JsonNode.DeepEquals(existing.Fields[pair.Key],change.Expected[pair.Key])&&!JsonNode.DeepEquals(existing.Fields[pair.Key],pair.Value)))
                         throw new IntegratedConflict("同一字段已被其他成员修改，请刷新后核对");
                     var fields=(JsonObject)existing.Fields.DeepClone();
                     foreach(var pair in change.Fields) {if(pair.Value is null)fields.Remove(pair.Key);else fields[pair.Key]=pair.Value.DeepClone();}
                     var required=existing.Kind=="opinion"?"text":"name";
                     if(existing.Kind!="preferences" && string.IsNullOrWhiteSpace(fields[required]?.GetValue<string>()))throw new ArgumentException("名称或意见不能为空");
                     if(existing.Kind=="opinion" && fields["done"] is null)throw new ArgumentException("完成状态不能为空");
-                    var entity=existing with {Fields=fields,Revision=existing.Revision+1};
+                    var entity=existing with {Fields=existing.Kind=="opinion"?StampOpinion(fields,existing.Fields,change.Fields):fields,Revision=existing.Revision+1};
                     await Write(connection,transaction,actor.WorkspaceId,entity,false);rows[entity.Id]=entity;
                 }
             }

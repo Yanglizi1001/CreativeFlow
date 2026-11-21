@@ -51,6 +51,8 @@ export default function App() {
   const [versionDialog,setVersionDialog]=useState(null);
   const [info,setInfo]=useState(null);
   const [spaceDialog,setSpaceDialog]=useState(false);
+  const [managerHost,setManagerHost]=useState('');
+  useEffect(()=>window.creativeFlowWindow?.onManagerOpenClient?.(host=>{guard(async()=>{try{setWelcome(false);const connections=await workspaceStore.list();const connection=host&&connections.find(c=>c.host===host);if(connection)await switchSpace(connection);else{setManagerHost(host||'');setSpaceDialog(true);}}catch(error){setToast({message:error.message,type:'error'});}});}),[]);
   const [accessProfile,setAccessProfile]=useState(null);
   const [welcome,setWelcome]=useState(()=>Boolean(window.creativeFlowWindow?.employeeAccess)&&!personalDataExisted&&!localStorage.getItem('creative-flow-welcome-v1')&&window.location.hash!=='#/widgets');
   useEffect(()=>{const api=window.creativeFlowWindow?.employeeAccess;if(!api||window.location.hash==='#/widgets')return;const read=()=>api.pending().then(value=>{if(value){setAccessProfile(value);setWelcome(false);setSpaceDialog(true);}}).catch(error=>setToast({message:error.message,type:'error'}));read();return api.onFile(read);},[]);
@@ -148,6 +150,8 @@ export default function App() {
     {label:flow.space?'导出当前可见资料':'导出备份',icon:'download',action:backups.exportData},
     {label:'导入备份',icon:'upload',disabled:Boolean(flow.space),action:()=>guard(backups.importData)},
     {heading:'公司协作'},
+    {label:'协作管理器',action:()=>window.creativeFlowWindow?.openManager?.().catch(error=>notify(error.message,'error'))},
+    {label:'协作部署与使用说明',action:()=>window.creativeFlowWindow?.openManagerGuide?.().catch(error=>notify(error.message,'error'))},
     {label:'切换空间 / 加入公司',action:()=>guard(()=>setSpaceDialog(true))},
     {label:'上传本地项目资料',disabled:Boolean(flow.space),action:()=>guard(()=>setUploadDialog(true))},
     {label:'空间成员与邀请码',disabled:!flow.space,action:()=>guard(()=>setMembersDialog(true))},
@@ -177,7 +181,7 @@ export default function App() {
     <TitleBar query={query} setQuery={setQuery} flow={flow} onSpace={()=>guard(()=>setSpaceDialog(true))} onProject={openProject} onTask={openTask} menuItems={menuItems} onClose={()=>guard(()=>window.creativeFlowWindow?.close())} />
     <NavRail view={view} setView={changeView} />
     <div className="app-content">
-      {view === 'projects' ? <ProjectExplorer flow={flow} query={query} onNewProject={openNewProject} onNewTask={() => openNewTask('',flow.active.project?.id)} onProject={openProject} onTask={openTask} /> : null}
+      {view === 'projects' ? <ProjectExplorer autoCollapseBelow={projectLevel==='task'?1220:0} flow={flow} query={query} onNewProject={openNewProject} onNewTask={() => openNewTask('',flow.active.project?.id)} onProject={openProject} onTask={openTask} /> : null}
       {view === 'review' ? <ReviewExplorer flow={flow} query={query} onOpen={openReview} onProject={openReviewCenter} /> : null}
       <section className="main-surface">
         <div className="workspace-path"><Breadcrumbs items={pathItems}/><HistoryButtons flow={flow} onTravel={travel}/><Button className="workspace-back" icon="left" aria-label="返回上一页" title={returnStack.length ? '返回来源页面' : canGoBack ? '返回上一级' : '暂无上一页'} disabled={!canGoBack} onClick={goBack}>返回</Button></div>
@@ -202,7 +206,7 @@ export default function App() {
     {lifecycleDialog?<LifecycleDialog flow={flow} onClose={()=>setLifecycleDialog(false)}/>:null}
     {switchLock?<div className="space-switch-lock" role="status">正在等待其他窗口确认切换空间…</div>:null}
     {welcome?<Modal title="欢迎使用创作流" onClose={()=>{localStorage.setItem('creative-flow-welcome-v1','1');setWelcome(false);}}><p>先管理自己的项目，或加入公司的局域网协作空间。</p><div className="space-connections"><Button onClick={()=>{localStorage.setItem('creative-flow-welcome-v1','1');setWelcome(false);}}>先使用本地项目</Button><Button variant="primary" onClick={()=>{localStorage.setItem('creative-flow-welcome-v1','1');setWelcome(false);setSpaceDialog(true);}}>加入公司协作空间</Button></div></Modal>:null}
-    {spaceDialog?<SpaceDialog flow={flow} notify={notify} onSwitch={switchSpace} accessProfile={accessProfile} onAccessConsumed={()=>setAccessProfile(null)} onClose={()=>setSpaceDialog(false)}/>:null}
+    {spaceDialog?<SpaceDialog initialHost={managerHost} flow={flow} notify={notify} onSwitch={switchSpace} accessProfile={accessProfile} onAccessConsumed={()=>setAccessProfile(null)} onClose={()=>setSpaceDialog(false)}/>:null}
     {uploadDialog?<UploadProjectDialog flow={flow} notify={notify} onClose={()=>setUploadDialog(false)}/>:null}
     <input ref={backups.inputRef} hidden type="file" accept=".json" onChange={backups.receive}/>
     {creation?<CreationDialog request={creation} flow={flow} onClose={()=>setCreation(null)} onCreated={created}/>:null}

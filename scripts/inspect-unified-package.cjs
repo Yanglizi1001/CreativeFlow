@@ -1,0 +1,14 @@
+const {app}=require('electron'),fs=require('fs'),path=require('path'),os=require('os'),assert=require('assert/strict'),crypto=require('crypto');
+const {absolute}=require('./project-paths.cjs');app.setPath('userData',fs.mkdtempSync(path.join(os.tmpdir(),'creativeflow-071-payload-')));app.commandLine.appendSwitch('disable-gpu');
+app.whenReady().then(()=>{
+ const base=absolute('buildRoot','client/win-unpacked'),asar=path.join(base,'resources/app.asar'),extra=path.join(base,'resources/collaboration-host');
+ for(const file of ['electron/main.cjs','electron/workbench.cjs','electron/manager-entry.cjs','electron/manager-window.cjs','electron/manager-bridge.cjs','host-manager/electron/main.cjs','host-manager/electron/preload.cjs','host-manager/electron/window-trust.cjs','host-manager/dist/index.html'])assert.ok(fs.existsSync(path.join(asar,file)),file);
+ assert.ok(fs.readFileSync(path.join(asar,'electron/main.cjs'),'utf8').includes('--collaboration-manager'));
+ for(const file of ['deployment/host/CreativeFlow.Host.exe','deployment/host/coreclr.dll','deployment/Install-Host.ps1','scripts/Manager.ps1','scripts/Remove-ClientStartup.ps1','使用说明.pdf'])assert.ok(fs.existsSync(path.join(extra,file)),file);
+ function walk(dir){return fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(path.join(dir,e.name)):[path.join(dir,e.name)]);}
+ const hash=f=>crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex'),source=absolute('publishedHost');
+ for(const f of walk(source))assert.equal(hash(f),hash(path.join(extra,'deployment/host',path.relative(source,f))));
+ for(const f of walk(extra))assert.ok(!/\.(db(?:-wal|-shm)?|sqlite|pfx|cer|cfspace|key)$|appsettings\.Production\.json$/i.test(f),f);
+ assert.equal(fs.existsSync(path.join(base,'创作流协作管理器.exe')),false);assert.equal(hash(path.join(extra,'使用说明.pdf')),hash(fs.existsSync(path.resolve(__dirname,'../output/pdf/创作流-内置协作管理使用说明.pdf'))?path.resolve(__dirname,'../output/pdf/创作流-内置协作管理使用说明.pdf'):path.resolve(__dirname,'../docs/manuals/pdf/Unified-Guide.pdf')));
+ const output=absolute('qaRoot','integration/unified-payload');fs.mkdirSync(output,{recursive:true});fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({passed:true,checkedAt:new Date().toISOString(),hostFilesVerified:walk(source).length,checks:['integrated manager entry, renderer and preload are inside the client ASAR','self-contained host and .NET runtime bundled as client resources','all published host files match embedded deployment payload hashes','unified guide matches bundled help','no deployed workspace, private certificate or invitation file included','no standalone manager executable required'],scope:'Actual packaged ASAR mounted by Electron plus every external host resource hash verified. Installer and portable GUI flows are tested separately.'},null,2));console.log('Unified packaged resources verified.');app.quit();
+}).catch(error=>{console.error(error);app.exit(1);});

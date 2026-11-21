@@ -1,7 +1,7 @@
 const {isDeepStrictEqual}=require('node:util');
 const copy=value=>structuredClone(value);
 const levels={none:0,view:1,comment:2,edit:3,manage:4};
-const workFields=(kind,fields)=>{const result={...fields};if(kind==='version')delete result.duration;return result;};
+const workFields=(kind,fields)=>{const result={...fields};if(kind==='version')delete result.duration;if(kind==='opinion')for(const key of ['createdAt','updatedAt','statusChangedAt','timeOrigin','inheritedFrom','sourceCreatedAt'])delete result[key];return result;};
 function applyCommands(snapshot,commands,{strict=false,actor}={}) {
   const data=copy(snapshot),rows=new Map(data.entities.map(row=>[row.id,row]));
   for(const command of commands) {
@@ -18,7 +18,7 @@ function applyCommands(snapshot,commands,{strict=false,actor}={}) {
         if(command.type==='delete'&&row.kind==='version')required=4;
         if((levels[row.permission]||0)<required||row.kind==='preferences'&&actor.role!=='owner')throw Error('没有修改此内容的权限');
         if(command.type==='delete'&&(command.expected?!isDeepStrictEqual(workFields(row.kind,command.expected),workFields(row.kind,row.fields)):command.revision!==row.revision))throw Error('内容已在其他窗口修改，请重新选择');
-        if(command.type==='update')for(const [key,value] of Object.entries(command.expected||{}))if(!isDeepStrictEqual(row.fields[key]??null,value)&&!isDeepStrictEqual(row.fields[key]??null,command.fields[key]??null))throw Error('内容已在其他窗口修改，草稿已保留，请核对后重试');
+        if(command.type==='update')for(const [key,value] of Object.entries(workFields(row.kind,command.expected||{})))if(!isDeepStrictEqual(row.fields[key]??null,value)&&!isDeepStrictEqual(row.fields[key]??null,command.fields[key]??null))throw Error('内容已在其他窗口修改，草稿已保留，请核对后重试');
       }
     }
     if(command.type==='create'||command.type==='restore') {

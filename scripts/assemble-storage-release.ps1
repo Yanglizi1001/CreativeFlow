@@ -1,6 +1,7 @@
 ﻿$ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $layout=Get-Content -LiteralPath (Join-Path $root 'config\project-layout.json') -Raw|ConvertFrom-Json
+if($layout.releaseKind -eq 'unified'){& (Join-Path $PSScriptRoot 'assemble-unified-release.ps1');exit $LASTEXITCODE}
 $delivery=Join-Path (Join-Path $root $layout.releaseRoot) $layout.releaseName
 if((Test-Path -LiteralPath $delivery) -or (Test-Path -LiteralPath ($delivery+'.zip'))){throw '当前交付批次已存在。请先分配新批次，不覆盖已交付文件。'}
 $client=Join-Path $delivery '客户端';$server=Join-Path $delivery '服务器';$docs=Join-Path $delivery '说明书';$qa=Join-Path $delivery '验证记录'
@@ -17,7 +18,12 @@ Copy-Item -LiteralPath (Join-Path $root 'output\pdf\创作流0.7.1beta-部署与
 Copy-Item -LiteralPath (Join-Path $root 'output\pdf\创作流协作主机管理器-使用说明.pdf') -Destination (Join-Path $docs '协作管理器使用说明.pdf') -Force
 Copy-Item -LiteralPath (Join-Path $root 'docs\manuals\0.7.1-beta-部署与使用说明.md'),(Join-Path $root 'docs\manuals\协作主机管理器-使用说明.md') -Destination $docs -Force
 Copy-Item -LiteralPath (Join-Path $root 'docs\manuals\0.7.1-beta-版本管理更新说明.md') -Destination (Join-Path $docs '版本管理更新说明.md')
+Copy-Item -LiteralPath (Join-Path $root 'docs\manuals\0.7.1-beta-意见排序更新说明.md') -Destination (Join-Path $docs '意见排序更新说明.md')
+Copy-Item -LiteralPath (Join-Path $root 'docs\manuals\0.7.1-beta-审阅布局优化说明.md') -Destination (Join-Path $docs '审阅布局优化说明.md')
 $reports=@{
+    '意见排序完整交互验证.json'=(Join-Path $layout.qaRoot 'integration\opinion-sorting\result.json')
+    '客户端基础测试.json'=(Join-Path $layout.qaRoot 'opinion-unit-tests.json')
+    '管理器打包入口验证.json'=(Join-Path $layout.qaRoot 'manager\package-qa\result.json')
     '主机服务打包一致性验证.json'=(Join-Path $layout.qaRoot 'manager\service-payload-result.json')
     '版本管理完整交互验证.json'=(Join-Path $layout.qaRoot 'integration\version-management\result.json')
     '协作视频缩略图验证.json'=(Join-Path $layout.qaRoot 'integration\thumbnail-qa\result.json')
@@ -34,21 +40,23 @@ $reports=@{
     '备份迁移恢复验证.json'=(Join-Path $layout.qaRoot 'manager\maintenance-result.json')
 }
 Copy-Item -LiteralPath (Join-Path $root (Join-Path $layout.qaRoot 'service-tests\version-management.trx')) -Destination (Join-Path $qa 'version-management.trx')
+Copy-Item -LiteralPath (Join-Path $root (Join-Path $layout.qaRoot 'service-tests\opinion-sorting.trx')) -Destination (Join-Path $qa 'opinion-sorting.trx')
 foreach($name in $reports.Keys){$source=Join-Path $root $reports[$name];$result=Get-Content -LiteralPath $source -Raw|ConvertFrom-Json;if(!$result.passed){throw "验证未通过：$name"};Copy-Item -LiteralPath $source -Destination (Join-Path $qa $name) -Force}
 @'
-创作流 0.7.1 beta — 版本管理完整安装包
-更新日期：2026-11-20
+创作流 0.7.1 beta — 审阅布局优化完整安装包
+更新日期：2026-11-21
 
-本次新增统一的版本删除入口、版本回收站、恢复、并发确认与在线协作删除。此前缩略图、窗口校验、容量和自启功能保留。
+本次优化客户端的单行排序工具条、审阅侧栏宽度和整体意见独立分区，修复标题竖排，并统一任务清单、审阅、修改意见中心和小组件的分组表现。原有意见排序、版本管理、缩略图、权限、离线同步和主机管理功能保留。
+详细操作见“说明书 / 审阅布局优化说明.md”。
 
-重要升级顺序：先在公司服务器安装或运行本包新版协作管理器，在“设置与维护”点击“升级现有主机”（沿用原路径，自动完整备份），再更新员工客户端。请勿卸载协作服务或新建公司空间。仅本地用户只需更新客户端。
-原证书、成员、项目、视频、意见和排期保留。仅更新管理器界面并不等于服务已升级，必须执行“升级现有主机”。
+本次只需更新客户端：此前已升级至2026-11-21意见排序批次的公司主机无需再次升级或重启。管理器及主机服务沿用上一批次，完整包中继续提供，供新部署使用。
+还在早期主机版本的用户，仍应先在管理器“设置与维护”中“升级现有主机”，再更新员工客户端。请勿卸载协作服务或新建公司空间。仅本地用户只需更新客户端。原证书、成员、项目、视频、意见和排期保留。
 
 新操作：审阅页或审阅中心预览的“版本操作 → 删除当前版本”；任务详情保留“删除版本”。应用菜单与版本操作中可打开“版本回收站”。
 协作删除仅可管理成员执行，必须联网且完成待同步修改；主机确认前不显示删除成功。未保存草稿、意见更新及发布中的视频会提示先处理。
 本地和共享盘原文件不删除，协作视频在回收站仍占空间并受清理保护。删除最后版本不删除任务与排期，版本编号继续递增。
 详细步骤及恢复规则见“说明书 / 版本管理更新说明.md”。
-本轮客户端与服务端均已更新并完成独立空间验证，其余未改动的维护适配器证据沿用基线，见验证范围.txt。
+本轮客户端已更新并完成独立示例空间验证，未改动的管理器与主机服务证据沿用基线，见验证范围.txt。
 
 本包包含员工客户端（安装版和免安装版）、协作管理器（安装版和免安装版）、主机协作服务、服务器离线运行环境、维护工具和两份使用说明。服务器无需另行安装 .NET；员工无需手工安装 Windows 证书。
 

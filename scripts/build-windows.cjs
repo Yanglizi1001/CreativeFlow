@@ -9,5 +9,5 @@ run(dotnet,['publish','collaboration-dev/server/CreativeFlow.Host/CreativeFlow.H
 run(node,['node_modules/vite/bin/vite.js','build']);
 run(node,['node_modules/vite/bin/vite.js','build','--config','host-manager/vite.config.mjs']);
 run(node,['scripts/prepare-desktop.cjs']);run(node,['scripts/prepare-host-manager.cjs']);
-for(const project of [layout.desktopStaging,'host-manager'])run(node,['node_modules/electron-builder/out/cli/cli.js','--projectDir',project,'--win','nsis','portable','--x64']);
+for(const project of layout.releaseKind==='unified'?[layout.desktopStaging]:[layout.desktopStaging,'host-manager'])run(node,['node_modules/electron-builder/out/cli/cli.js','--projectDir',project,'--win','nsis','portable','--x64']);
 if(!buildOnly)run(path.join(process.env.WINDIR,'System32/WindowsPowerShell/v1.0/powershell.exe'),['-NoProfile','-ExecutionPolicy','Bypass','-File','scripts/assemble-storage-release.ps1']);

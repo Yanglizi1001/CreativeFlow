@@ -11,6 +11,9 @@ ipcRenderer.on('window:flush-input', (_event, requestId) => {
 
 contextBridge.exposeInMainWorld('creativeFlowWindow', {
   sessionId: process.argv.find(value=>value.startsWith('--creative-flow-session='))?.split('=').at(-1),
+  openManager:()=>ipcRenderer.invoke('manager:open'),
+  openManagerGuide:()=>ipcRenderer.invoke('manager:guide'),
+  onManagerOpenClient:callback=>{const listener=(_event,host)=>callback(host);ipcRenderer.on('manager:open-client',listener);return()=>ipcRenderer.removeListener('manager:open-client',listener);},
   onFlushWork: callback => {flushWork=callback;return()=>{if(flushWork===callback)flushWork=null;};},
   collaboration: {
     disconnect: id => ipcRenderer.invoke('collaboration:disconnect',id),

@@ -34,9 +34,9 @@ export function NavRail({ view, setView }) {
   return <aside className="navrail"><nav>{navItems.map(([id, icon, label]) => <button key={id} className={view === id ? 'active' : ''} aria-current={view === id ? 'page' : undefined} title={label} onClick={() => setView(id)}><Icon name={icon} size={22} /><span>{label}</span></button>)}</nav><button className={`bottom ${view === 'settings' ? 'active' : ''}`} onClick={() => setView('settings')}><Icon name="settings" size={22} /><span>设置</span></button></aside>;
 }
 
-export function ProjectExplorer({ flow, query, onNewProject, onNewTask, onProject, onTask }) {
+export function ProjectExplorer({ autoCollapseBelow=0, flow, query, onNewProject, onNewTask, onProject, onTask }) {
   const projects = flow.db.projects.filter(project => !query || `${project.name} ${project.tasks.map(task => task.name).join(' ')}`.toLowerCase().includes(query.toLowerCase()));
-  return <ExplorerPanel title="项目与任务" label="项目" storageKey="creative-flow-project-explorer-width" actions={<button title="新建项目" aria-label="新建项目" onClick={onNewProject}><Icon name="plus"/></button>}>
+  return <ExplorerPanel autoCollapseBelow={autoCollapseBelow} title="项目与任务" label="项目" storageKey="creative-flow-project-explorer-width" actions={<button title="新建项目" aria-label="新建项目" onClick={onNewProject}><Icon name="plus"/></button>}>
     <div className="explorer-list">{projects.map(project => <section key={project.id} className={flow.active.project?.id === project.id ? 'current' : ''}>
       <button className="project-row" onClick={() => onProject(project.id)}><i style={{ background: project.color }} /><Icon name="folder" /><strong>{project.name}</strong><span>{project.tasks.length}</span></button>
       {flow.active.project?.id === project.id ? <div className="task-tree">{project.tasks.map(task => { const progress = countItems(task); return <button key={task.id} className={flow.active.task?.id === task.id ? 'active' : ''} onClick={() => onTask(project.id, task.id)}><TypeIcon type={task.type} /><span>{task.name}</span><em>{progress.done}/{progress.total}</em></button>; })}<button className="add-tree" onClick={onNewTask}><Icon name="plus" />新增任务</button></div> : null}

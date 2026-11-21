@@ -9,6 +9,11 @@ function Assert-Administrator {
     if(!(New-Object Security.Principal.WindowsPrincipal($identity)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){throw '请以管理员身份运行协作主机管理器。'}
 }
 function Get-ManagerSettingsPath {Join-Path $env:ProgramData 'CreativeFlow Manager\settings.json'}
+function Test-LegacyManager {
+    foreach($key in @('HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*','HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*','HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*')){
+        if(Get-ItemProperty -Path $key -ErrorAction SilentlyContinue|Where-Object {$_.DisplayName -eq '创作流协作管理器'}){return $true}
+    };return $false
+}
 function Get-ManagerStartupStatus {
     $file=Join-Path (Split-Path (Get-ManagerSettingsPath) -Parent) 'manager-startup.json'
     $task=Get-ScheduledTask -TaskName CreativeFlowManagerLogon -ErrorAction SilentlyContinue
@@ -198,6 +203,14 @@ function Remove-UninstalledSpace($Plan) {
     Remove-Item -LiteralPath $Plan.configFile -Force
 }
 function Invoke-ManagerRequest($Request,[string]$Resources) {
+    if($Request.action -eq 'public-status'){
+        $admin=(New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+        try{$service=Get-Service CreativeFlowHost -ErrorAction Stop}catch{
+            if($_.FullyQualifiedErrorId -notlike '*NoServiceFoundForGivenName*'){return @{installed=$null;state='Unknown';computerName=[Environment]::MachineName;administrator=$admin;publicError='暂时无法读取本机服务状态，授权后再核对；请勿因此重复建立空间。'}}
+            $service=$null
+        }
+        return @{installed=!!$service;state=if($service){[string]$service.Status}else{'NotInstalled'};computerName=[Environment]::MachineName;administrator=$admin;legacyManager=(Test-LegacyManager)}
+    }
     $installation=Get-HostInstallation;$s=$installation.settings;$action=[string]$Request.action
     if($action -notin @('status','diagnose')){Assert-Administrator}
     switch($action) {
@@ -210,7 +223,7 @@ function Invoke-ManagerRequest($Request,[string]$Resources) {
             $drives=@(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | ForEach-Object {@{name=$_.DeviceID;free=[double]$_.FreeSpace;size=[double]$_.Size}})
             $lastBackup=$null;$lastBackupFile=Join-Path (Split-Path (Get-ManagerSettingsPath) -Parent) 'last-backup.json';if(Test-Path -LiteralPath $lastBackupFile){$lastBackup=Get-Content -LiteralPath $lastBackupFile -Raw|ConvertFrom-Json}
             $storage=$null;$storageError='';if($space){try{$storage=Invoke-HostCli $s.installDirectory $s.dataDirectory @{action='storage-summary'}}catch{$storageError='容量管理需要配套主机，请先升级现有主机。'}}
-            return @{installed=!!$installation.service;state=if($installation.service){$installation.service.State}else{'NotInstalled'};autostart=($installation.service.StartMode -eq 'Auto');managerStartup=(Get-ManagerStartupStatus);storage=$storage;storageError=$storageError;settings=$s;space=$space;managementError=$managementError;certificate=$cert;port=$port;url="https://$($s.serverName):$port";computerName=[Environment]::MachineName;drives=$drives;lastBackup=$lastBackup}
+            return @{legacyManager=(Test-LegacyManager);installed=!!$installation.service;state=if($installation.service){$installation.service.State}else{'NotInstalled'};autostart=($installation.service.StartMode -eq 'Auto');managerStartup=(Get-ManagerStartupStatus);storage=$storage;storageError=$storageError;settings=$s;space=$space;managementError=$managementError;certificate=$cert;port=$port;url="https://$($s.serverName):$port";computerName=[Environment]::MachineName;drives=$drives;lastBackup=$lastBackup}
         }
         'diagnose' {
             $port=47840;if($installation.config.Host.TlsPort){$port=[int]$installation.config.Host.TlsPort}
@@ -404,10 +417,17 @@ function Invoke-ManagerRequest($Request,[string]$Resources) {
 if($Library){return}
 $maintenanceMutex=$null;$ownsMutex=$false
 try {
+    if(!$Scheduled){
+        $raw=[Console]::In.ReadToEnd();if($raw.Length -gt 65536){throw '管理请求过大。'};$request=$raw|ConvertFrom-Json
+        if($request.action -eq 'public-status'){
+            $result=Invoke-ManagerRequest $request (Split-Path $PSScriptRoot -Parent)
+            'CFMANAGER:'+($result|ConvertTo-Json -Depth 12 -Compress);return
+        }
+    }
     $maintenanceMutex=New-Object Threading.Mutex($false,'Global\CreativeFlowHostMaintenance071')
     try{$ownsMutex=$maintenanceMutex.WaitOne(0)}catch [Threading.AbandonedMutexException]{$ownsMutex=$true}
     if(!$ownsMutex){throw '另一项主机维护或自动备份正在进行，请稍后再试。'}
-    if($Scheduled){$settings=Read-ManagerSettings;$request=@{action='backup';path=$settings.backupDirectory}}else{$raw=[Console]::In.ReadToEnd();if($raw.Length -gt 65536){throw '管理请求过大。'};$request=$raw|ConvertFrom-Json}
+    if($Scheduled){$settings=Read-ManagerSettings;$request=@{action='backup';path=$settings.backupDirectory}}
     $resources=Split-Path $PSScriptRoot -Parent
     $result=Invoke-ManagerRequest $request $resources
     if($Scheduled){$record=Join-Path (Split-Path (Get-ManagerSettingsPath) -Parent) 'last-backup.json';@{ok=$true;at=(Get-Date).ToString('o');path=$result.path}|ConvertTo-Json|Set-Content -LiteralPath $record -Encoding UTF8}

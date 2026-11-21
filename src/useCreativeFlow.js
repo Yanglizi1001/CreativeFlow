@@ -121,7 +121,7 @@ export function useCreativeFlow() {
     if(!task)return null;
     const previous=task.versions.find(v=>v.id===sourceVersionId);
     const number=nextVersionNumber(task);
-    const version={id:uid('version'),name:name?.trim()||`V${number}`,status:'进行中',createdAt:new Date().toLocaleDateString('sv-SE'),file,lists:inherit&&previous?previous.lists.map(source=>({id:uid('list'),name:source.name,items:source.items.filter(row=>!row.done).map(row=>({...row,id:uid('item'),done:false,status:'todo'}))})):[]};
+    const version={id:uid('version'),name:name?.trim()||`V${number}`,status:'进行中',createdAt:new Date().toLocaleDateString('sv-SE'),file,lists:inherit&&previous?previous.lists.map(source=>({id:uid('list'),name:source.name,items:source.items.filter(row=>!row.done).map(row=>({...row,id:uid('item'),done:false,status:'todo',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),statusChangedAt:undefined,timeOrigin:'inherited',inheritedFrom:row.id,sourceCreatedAt:row.createdAt}))})):[]};
     const saved=await updateProjectAt(projectId,p=>({...p,tasks:p.tasks.map(t=>t.id===taskId?{...t,versionSequence:Math.max(number,t.versionSequence||0),versions:[...t.versions,version]}:t)}),`创建了版本 ${version.name}`);
     if(saved===null)return null;
     setSelection({projectId,taskId,versionId:version.id,listId:version.lists[0]?.id});
@@ -194,7 +194,7 @@ export function useCreativeFlow() {
   const removeItem=itemId=>removeItemAt(active.project.id,active.task.id,active.version.id,active.list.id,itemId);
   const undoDeleteItem=()=>{if(deletedItem)workStore.travel('undo',deletedItem.token).catch(()=>{});setDeletedItem(null);};
   useEffect(() => { if (!deletedItem) return; const timer = setTimeout(() => setDeletedItem(null), 10000); return () => clearTimeout(timer); }, [deletedItem]);
-  const importItems = rows => updateList(list => ({ ...list, items: [...list.items, ...rows.map(row => ({ ...row, id: uid('item'), done: false, status: 'todo' }))] }), `导入了 ${rows.length} 条修改意见`);
+  const importItems = rows => updateList(list => ({ ...list, items: [...list.items, ...rows.map(row => ({ ...row, id: uid('item'), done: false, status: 'todo',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),timeOrigin:'imported' }))] }), `导入了 ${rows.length} 条修改意见`);
   const setFile = file => updateVersion(version => ({ ...version, file, duration: undefined, reviewPosition: 0 }), `关联了版本文件「${file?.name || '未命名文件'}」`);
   const clearFile = () => {
     if (!active.version?.file) return false;

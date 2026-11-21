@@ -213,14 +213,16 @@ export function useResizableWidth(storageKey, initial = 252, min = 220, max = 36
   return { width, setWidth, resetWidth, min, max };
 }
 
-export function ExplorerPanel({ title, label, storageKey, actions, className = '', children }) {
+export function ExplorerPanel({ title, label, storageKey, actions, className = '', children, autoCollapseBelow=0 }) {
   const [collapsed,setCollapsed]=useState(false);
+  const [narrow,setNarrow]=useState(()=>autoCollapseBelow>0&&window.innerWidth<autoCollapseBelow);
+  useEffect(()=>{const resize=()=>setNarrow(autoCollapseBelow>0&&window.innerWidth<autoCollapseBelow);resize();if(!autoCollapseBelow)return;window.addEventListener('resize',resize);return()=>window.removeEventListener('resize',resize);},[autoCollapseBelow]);
   const size=useResizableWidth(storageKey,252,220,360);
   const toggleRef=useRef(null);
   const focusPending=useRef(false);
   const toggle=()=>{focusPending.current=true;setCollapsed(current=>!current);};
   useEffect(()=>{if(focusPending.current){toggleRef.current?.focus();focusPending.current=false;}},[collapsed]);
-  if(collapsed)return <aside className={`explorer collapsed ${className}`.trim()} aria-label={title}><button ref={toggleRef} title={`展开${label}侧栏`} aria-label={`展开${label}侧栏`} aria-expanded={false} onClick={toggle}><Icon name="right"/></button></aside>;
+  if(collapsed||narrow)return <aside className={`explorer collapsed ${className}`.trim()} aria-label={title}><button ref={toggleRef} disabled={narrow} title={narrow?'窗口较窄，已收起项目导航；增大窗口后可展开':`展开${label}侧栏`} aria-label={`展开${label}侧栏`} aria-expanded={false} onClick={toggle}><Icon name="right"/></button></aside>;
   return <aside className={`explorer resizable-panel ${className}`.trim()} aria-label={title} style={{width:size.width}}><div className="explorer-heading"><strong>{title}</strong><div>{actions}<button ref={toggleRef} title={`收起${label}侧栏`} aria-label={`收起${label}侧栏`} aria-expanded={true} onClick={toggle}><Icon name="left"/></button></div></div>{children}<ResizeHandle {...size}/></aside>;
 }
 

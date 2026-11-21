@@ -4,9 +4,10 @@ import {workspaceStore} from './workspaceStore';
 import {prepareProjectUpload} from './model.mjs';
 const message=error=>String(error?.message||error).replace(/^Error invoking remote method '[^']+': (?:Error: )?/,'');
 
-export function SpaceDialog({flow,onClose,onSwitch,notify,accessProfile,onAccessConsumed}) {
+export function SpaceDialog({flow,onClose,onSwitch,notify,accessProfile,onAccessConsumed,initialHost=''}) {
   const [connections,setConnections]=useState([]),[error,setError]=useState(''),[busy,setBusy]=useState(false);
-  const [form,setForm]=useState({host:'',invitationCode:'',displayName:''});
+  const [form,setForm]=useState({host:initialHost,invitationCode:'',displayName:''});
+  useEffect(()=>{if(initialHost)setForm(old=>({...old,host:initialHost,invitationCode:''}));},[initialHost]);
   const [profile,setProfile]=useState(null),[trusted,setTrusted]=useState(false),[report,setReport]=useState(null);
   const access=window.creativeFlowWindow?.employeeAccess;
   function useProfile(value){if(!value)return;setProfile(value);setTrusted(value.trusted===true);setReport(null);setError('');setForm(old=>({...old,host:value.host,invitationCode:''}));onAccessConsumed?.();}

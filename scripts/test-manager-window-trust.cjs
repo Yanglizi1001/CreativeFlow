@@ -35,12 +35,13 @@ async function run(label,asar,fail=false){
 (async()=>{
  await run('source',null);
  const folder=fs.mkdtempSync(path.join(os.tmpdir(),'creativeflow-manager-qa-'));
- const source=absolute('buildRoot','manager/win-unpacked/resources/app.asar');
+ const unified=require('./project-paths.cjs').layout.releaseKind==='unified';
+ const source=absolute('buildRoot',unified?'client/win-unpacked/resources/app.asar':'manager/win-unpacked/resources/app.asar');
  for(const name of ['normal','中文 路径 # ~ % 主机']){
   const target=path.join(folder,name,'app.asar');fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(source,target);
-  await run(name==='normal'?'packaged-short-temp':'packaged-chinese-special',target);
+  await run(name==='normal'?'packaged-short-temp':'packaged-chinese-special',unified?path.join(target,'host-manager'):target);
  }
- await run('status-retry',source,true);
+ await run('status-retry',unified?path.join(source,'host-manager'):source,true);
  fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({passed:true,checkedAt:new Date().toISOString(),scope:'Real Electron IPC and packaged ASAR; isolated fake controller. No company service or data changes.',checks},null,2));
  console.log('Manager window trust: all four real Electron scenarios passed.');
 })().catch(e=>{console.error(e);process.exitCode=1});

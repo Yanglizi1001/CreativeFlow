@@ -18,7 +18,7 @@ export function SettingsView({ flow, toast, onConnections }) {
   return <main className="page settings-page">
     <div className="page-heading"><div><h1>设置</h1><p>{flow.space?'当前为公司空间。导出仅包含你有权查看的项目资料；空间备份由协作主机管理。':'数据保存在当前电脑，可随时导出完整备份。'}</p></div></div>
     <DesktopBehavior toast={toast}/>
-    <section className="settings-group"><h2>公司空间与连接</h2><div className="setting-row"><span><strong>{flow.space?`${flow.space.name} · ${flow.space.displayName}`:'当前使用本地项目'}</strong><small>导入公司接入文件、配置信任证书、检测连接和管理此设备的空间接入。</small></span><Button onClick={onConnections}>管理公司连接</Button></div></section>
+    <section className="settings-group"><h2>公司空间与连接</h2><div className="setting-row"><span><strong>{flow.space?`${flow.space.name} · ${flow.space.displayName}`:'当前使用本地项目'}</strong><small>导入公司接入文件、配置信任证书、检测连接和管理此设备的空间接入。</small></span><div className="header-actions"><Button onClick={onConnections}>管理公司连接</Button><Button onClick={()=>window.creativeFlowWindow?.openManager?.().catch(error=>toast(error.message,'error'))}>打开协作管理器</Button></div></div></section>
     {flow.space&&<CompanyCapacity space={flow.space}/>}
     <ColorSettings flow={flow}/>
     {flow.db.preferences?.recoveryAvailable ? <section className="settings-group"><div className="setting-row"><span><strong>已保留无法识别的原始数据</strong><small>可导出原始记录，便于恢复和检查。</small></span><Button onClick={async()=>{const raw=localStorage.getItem('creative-flow-db-v2-recovery');if(raw&&window.creativeFlowWindow?.exportBackup&&await window.creativeFlowWindow.exportBackup(raw))toast('原始数据已导出');}}>导出原始数据</Button></div></section> : null}

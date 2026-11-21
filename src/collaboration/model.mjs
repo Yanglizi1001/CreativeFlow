@@ -5,7 +5,7 @@ export const ENTITY_FIELDS = Object.freeze({
   task: ['versionSequence','name','description','notes','status','type','start','due','color','defaultColor'],
   version: ['name','status','createdAt','file','duration'],
   list: ['name'],
-  opinion: ['text','time','done','status'],
+  opinion: ['text','time','done','status','createdAt','updatedAt','statusChangedAt','timeOrigin','inheritedFrom','sourceCreatedAt'],
   preferences: ['customOptions','tagColors']
 });
 const children = {project:['tasks','task'],task:['versions','version'],version:['lists','list'],list:['items','opinion']};
@@ -90,6 +90,7 @@ export function prepareProjectUpload(project, makeId=()=>crypto.randomUUID()) {
       if(value.file.path&&/\.(mp4|m4v|webm|mov)$/i.test(value.file.name||value.file.path))media.push({versionId:value.id,path:value.file.path,name:value.file.name||value.name});
       value.file=null;delete value.duration;
     }
+    if(kind==='opinion'&&!value.createdAt)value.timeOrigin='legacy';
     const child=children[kind];if(child) value[child[0]].forEach(entry=>visit(child[1],entry));
   }
   visit('project',uploaded);
