@@ -19,9 +19,9 @@ module.exports=async({github,context,core,folder=path.resolve('release/github')}
   if(asset.state!=='uploaded'||asset.size!==payload.data.length||asset.digest!=='sha256:'+payload.digest)throw Error('Upload verification failed: '+payload.name);
   staged.push({...payload,id:asset.id});core.info('Verified '+payload.name);
  }
- const ref=(await github.rest.git.getRef({owner,repo,ref:'tags/'+tag})).data;
- const archiveRef='tags/archive/'+tag+'-before-'+context.runId;
- await github.rest.git.createRef({owner,repo,ref:'refs/'+archiveRef,sha:ref.object.sha});
+ // Preserve prior sources in an archive branch before requesting replacement.
+ // Point the tag at this workflow's exact source before changing downloads.
+ await github.rest.git.updateRef({owner,repo,ref:'tags/'+tag,sha:context.sha,force:true});
  await github.rest.repos.updateRelease({owner,repo,release_id:release.id,draft:true});
  for(const item of staged){
   const existing=oldAssets.find(a=>a.name===item.name);if(existing)await github.rest.repos.deleteReleaseAsset({owner,repo,asset_id:existing.id});
@@ -31,7 +31,6 @@ module.exports=async({github,context,core,folder=path.resolve('release/github')}
  for(const asset of oldAssets.filter(a=>/^CreativeFlow-HostManager-/.test(a.name)||a.name==='HostManager-Guide.pdf'))await github.rest.repos.deleteReleaseAsset({owner,repo,asset_id:asset.id});
  const final=await github.paginate(github.rest.repos.listReleaseAssets,{owner,repo,release_id:release.id});
  for(const item of staged){const a=final.find(a=>a.name===item.name);if(!a||a.size!==item.data.length||a.digest!=='sha256:'+item.digest)throw Error('Final asset verification failed: '+item.name);}
- await github.rest.git.updateRef({owner,repo,ref:'tags/'+tag,sha:context.sha,force:true});
  release=(await github.rest.repos.updateRelease({owner,repo,release_id:release.id,target_commitish:context.sha,name:'创作流 0.7.1 beta · 本地创作与内置协作管理',body,draft:false,prerelease:true})).data;
  await core.summary.addHeading('创作流 0.7.1 beta 已替换更新').addLink('打开发布页',release.html_url).addRaw('\n安装版、免安装版、完整包、使用说明与 SHA-256 已上传并核对；管理器和主机运行资源已内置。').write();
 };

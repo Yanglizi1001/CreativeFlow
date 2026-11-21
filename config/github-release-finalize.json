@@ -1,0 +1,56 @@
+{
+  "version": "0.7.1-beta",
+  "runId": 44873250259,
+  "sourceSha": "b8e66fd7d38be3e4bd786639a47519d026886fb6",
+  "assets": [
+    {
+      "id": 774601440,
+      "name": "CreativeFlow-Full-0.7.1-beta-win-x64.zip",
+      "stagedName": "incoming-44873250259-CreativeFlow-Full-0.7.1-beta-win-x64.zip",
+      "size": 302931297,
+      "digest": "sha256:f2f2d4c6c636e485bbc4ab4d68371f1164957a4301a0006c92d77ff43386b03f"
+    },
+    {
+      "id": 774602299,
+      "name": "CreativeFlow-Portable-0.7.1-beta-win-x64.exe",
+      "stagedName": "incoming-44873250259-CreativeFlow-Portable-0.7.1-beta-win-x64.exe",
+      "size": 151062350,
+      "digest": "sha256:dd80ca8126247191b7f8ff43e7186c6bc4d2449fbe325842d7f58a7b248dab05"
+    },
+    {
+      "id": 774601975,
+      "name": "CreativeFlow-Setup-0.7.1-beta-win-x64.exe",
+      "stagedName": "incoming-44873250259-CreativeFlow-Setup-0.7.1-beta-win-x64.exe",
+      "size": 151527247,
+      "digest": "sha256:64d2aaa20b400674f662b4c4d97df2964a7a6a2854861baa64e9b2b672f7dc79"
+    },
+    {
+      "id": 774602574,
+      "name": "Deployment-Guide.pdf",
+      "stagedName": "incoming-44873250259-Deployment-Guide.pdf",
+      "size": 341820,
+      "digest": "sha256:630c8ce885acd682d4a94b34f022572363509a7f6ad728181de77428fa031ad7"
+    },
+    {
+      "id": 774602638,
+      "name": "Release-Notes.md",
+      "stagedName": "incoming-44873250259-Release-Notes.md",
+      "size": 4066,
+      "digest": "sha256:7dcab8cc2179ae68230421c25264c37e220adeabcd4e81bf8333aaa906f6f4fa"
+    },
+    {
+      "id": 774602659,
+      "name": "SHA256SUMS.txt",
+      "stagedName": "incoming-44873250259-SHA256SUMS.txt",
+      "size": 596,
+      "digest": "sha256:0b89c9b03fd13dac330c5f4328c75d239e7ca62277132a65fe7381d9f722d3c5"
+    },
+    {
+      "id": 774602605,
+      "name": "Version-Management-Guide.md",
+      "stagedName": "incoming-44873250259-Version-Management-Guide.md",
+      "size": 4055,
+      "digest": "sha256:6bbc7df06b0ec28e355e7e1627f50b8aa1a2de303932d043665933f53076ae47"
+    }
+  ]
+}

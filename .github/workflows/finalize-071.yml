@@ -1,0 +1,24 @@
+name: Finalize verified 0.7.1 beta uploads
+on:
+  push:
+    branches: [main]
+    paths: ['config/github-release-finalize.json']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: creativeflow-071-publish
+  cancel-in-progress: false
+jobs:
+  finalize:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            await require('./scripts/finalize-github-071.cjs')({github,context,core});
